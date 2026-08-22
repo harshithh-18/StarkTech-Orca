@@ -1,0 +1,47 @@
+# ── Python ────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# ── Node / frontend ───────────────────────────────────────────────────────
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# ── Secrets ───────────────────────────────────────────────────────────────
+# NEVER commit real keys. .env.example is the tracked template.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+credentials.json
+
+# ── Data artefacts (large / regenerable — see data/README.md) ─────────────
+data/cache/*
+data/copernicus/*
+data/geojson/*
+data/mock/*
+!data/**/.gitkeep
+*.nc
+*.zarr/
+*.geojson
+*.sqlite
+*.db
+
+# ChromaDB local persistence
+chroma/
+.chroma/
+
+# ── OS / editor ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json.example

@@ -1,0 +1,52 @@
+# ORCA backend dependencies.
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -r backend/requirements.txt
+#
+# Loose pins: minimum versions, no upper bounds. Tighten before the final freeze (P3)
+# so demo day can't be ruined by an upstream release.
+
+# ── Web ───────────────────────────────────────────────────────────────────
+fastapi>=0.115
+uvicorn[standard]>=0.32
+websockets>=13.0
+python-multipart>=0.0.12         # audio upload for the voice stretch goal
+
+# ── Schemas / config ──────────────────────────────────────────────────────
+pydantic>=2.9
+pydantic-settings>=2.6
+
+# ── Agents ────────────────────────────────────────────────────────────────
+langgraph>=0.2.45
+langgraph-checkpoint-sqlite>=2.0  # multi-turn memory keyed by session_id
+langchain-core>=0.3
+
+# ── LLM ───────────────────────────────────────────────────────────────────
+google-genai>=0.3                 # Gemini 2.x Flash — primary
+groq>=0.13                        # Llama — fast fallback
+
+# ── HTTP ──────────────────────────────────────────────────────────────────
+httpx>=0.27
+tenacity>=9.0                     # adapter retry/backoff
+
+# ── Geospatial ────────────────────────────────────────────────────────────
+shapely>=2.0                      # point-in-polygon, distance-to-boundary
+geopandas>=1.0
+pyproj>=3.7                       # geodesic distance + bearing (WGS84, not euclidean)
+
+# ── Gridded ocean data ────────────────────────────────────────────────────
+xarray>=2024.10
+netCDF4>=1.7
+numpy>=2.0
+copernicusmarine>=2.0             # used by scripts/, not at request time
+
+# ── Scraping (INCOIS + IMD — see docs/DATA_SOURCES.md) ────────────────────
+beautifulsoup4>=4.12
+lxml>=5.3
+
+# ── RAG ───────────────────────────────────────────────────────────────────
+chromadb>=0.5
+
+# ── Dev ───────────────────────────────────────────────────────────────────
+pytest>=8.3
+pytest-asyncio>=0.24
+ruff>=0.8

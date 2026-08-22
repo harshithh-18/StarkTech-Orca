@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ORCA global styles. Owner: D */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply antialiased text-ocean-deep;
+  /* Indic scripts need a fallback chain — a missing glyph box in the middle of a Telugu
+     answer is a demo-killer. Noto Sans covers every language we target. */
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    "Noto Sans",
+    "Noto Sans Telugu",
+    "Noto Sans Tamil",
+    "Noto Sans Malayalam",
+    "Noto Sans Bengali",
+    "Noto Sans Devanagari",
+    sans-serif;
+}
+
+/* Leaflet must fill its container or the map renders zero-height. */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+}
+
+/* TODO(P3, D): dark mode. Only if there is time — the projector is what matters, and a
+   bright verdict card reads better in a lit room than a dark one. */

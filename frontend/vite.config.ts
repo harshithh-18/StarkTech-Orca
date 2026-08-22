@@ -1,0 +1,15 @@
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    port: 5173,
+    // The backend runs on :8000. Proxying keeps the frontend origin-relative, so the
+    // deployed build needs no environment-specific URLs.
+    proxy: {
+      "/api": { target: "http://localhost:8000", changeOrigin: true },
+      "/ws": { target: "ws://localhost:8000", ws: true },
+    },
+  },
+});
