@@ -89,16 +89,16 @@ streaming. This is essentially the final demo; P3 only makes it survivable.
 
 **Goal:** make it impossible to break on stage.
 
-- [ ] **Cache + mock fallback** working; `ORCA_USE_MOCK_DATA=true` runs the whole demo — **B**
-- [ ] `data/mock/` captured from real responses for all four queries — **B**
+- [x] **Cache + mock fallback** working; `ORCA_USE_MOCK_DATA=true` runs the whole demo — **B**
+- [x] `data/mock/` captured from real responses for all four queries — **B**
 - [x] Every adapter degrades gracefully; no data source can produce a 500 — **B**
 - [x] Alert banners: cyclone / high wave / lightning / geofence — **D**
 - [x] Forecast charts: 48-hour wave + wind, tide curve — **D**
 - [x] Source citations visible under every answer — **C + D**
-- [ ] Mobile-legible layout — the real user is on a phone — **D + F**
-- [ ] UI polish pass: one glanceable verdict, not a wall of numbers — **D**
+- [x] Mobile-legible layout — the real user is on a phone — **D + F**
+- [x] UI polish pass: one glanceable verdict, not a wall of numbers — **D**
 - [x] Attribution footer (Open-Meteo CC-BY, Copernicus, INCOIS) — **D**
-- [ ] [DEMO_SCRIPT.md](DEMO_SCRIPT.md) written and rehearsed once — **A**
+- [x] [DEMO_SCRIPT.md](DEMO_SCRIPT.md) written and rehearsed once — **A**
 - [ ] Deck built — **all**
 - [ ] Deployed to Vercel + HF Spaces so judges have a link — **B + D**
 

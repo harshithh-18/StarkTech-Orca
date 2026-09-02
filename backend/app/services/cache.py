@@ -149,13 +149,106 @@ def capture_mock(key: str, value: Any) -> None:
         logger.warning("cache: could not capture mock %s (%s)", key, exc)
 
 
-def warm_all() -> None:
+def promote_cache_to_mocks() -> int:
+    """Copy every cache entry into data/mock/. Returns the number promoted.
+
+    This is how the mock set gets built: run the golden path against live APIs, then
+    promote what the cache captured. Mocks are therefore **captured from real calls,
+    never hand-written** — a hand-written mock is a lie you will eventually show a judge;
+    a captured one is yesterday's truth.
+    """
+    settings = get_settings()
+    cache_dir, mock_dir = settings.cache_dir, settings.mock_dir
+    if not cache_dir.exists():
+        return 0
+
+    mock_dir.mkdir(parents=True, exist_ok=True)
+    promoted = 0
+
+    for path in cache_dir.glob("*.json"):
+        try:
+            entry = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if "value" not in entry:
+            continue
+        (mock_dir / path.name).write_text(
+            json.dumps(entry, default=str), encoding="utf-8"
+        )
+        promoted += 1
+
+    logger.info("cache: promoted %d cache entries to %s", promoted, mock_dir)
+    return promoted
+
+
+def stats() -> dict:
+    """Counts and age of what is on disk. Used by /ready and the warming script."""
+    settings = get_settings()
+
+    def describe(directory: Path) -> dict:
+        if not directory.exists():
+            return {"entries": 0, "newest_age_s": None}
+        files = list(directory.glob("*.json"))
+        if not files:
+            return {"entries": 0, "newest_age_s": None}
+        newest = max(f.stat().st_mtime for f in files)
+        return {"entries": len(files), "newest_age_s": round(time.time() - newest)}
+
+    return {"cache": describe(settings.cache_dir), "mock": describe(settings.mock_dir)}
+
+
+async def warm_all(queries: list[dict] | None = None) -> dict:
     """Pre-fetch every golden-path query so the demo runs from a warm cache.
 
     Run this on the demo machine BEFORE walking on stage. See docs/DEMO_SCRIPT.md.
 
-    TODO(P3, B): drive the golden-path queries through the graph so every adapter they
-                 touch lands in the cache. Deferred with the rest of the demo-hardening
-                 work — see the roadmap's P3 block.
+    Drives the queries through the real graph, so every adapter they touch lands in the
+    cache exactly as it would during the demo — warming the adapters directly would miss
+    whatever the planner actually decides to call.
     """
-    raise NotImplementedError("TODO(P3, B)")
+    from app.graph.builder import get_graph
+    from app.graph.state import PER_TURN_ACCUMULATORS, RESET
+
+    runs = queries or GOLDEN_PATH
+    results: dict[str, str] = {}
+
+    for index, run in enumerate(runs):
+        initial: dict = {
+            "query": run["query"],
+            "session_id": f"warm-{index}",
+            "input_lat": run.get("lat"),
+            "input_lon": run.get("lon"),
+            "session_context": {},
+            "verdict": None,
+            "verdict_reasons": [],
+            "plan": [],
+        }
+        for field in PER_TURN_ACCUMULATORS:
+            initial[field] = RESET
+
+        try:
+            state = await get_graph().ainvoke(
+                initial, config={"configurable": {"thread_id": f"warm-{index}"}}
+            )
+            skipped = state.get("skipped_agents") or []
+            results[run["query"][:48]] = (
+                f"ok ({len(state.get('evidence') or [])} evidence"
+                + (f", {len(skipped)} skipped" if skipped else "")
+                + ")"
+            )
+        except Exception as exc:  # noqa: BLE001 - warming must report, not crash
+            results[run["query"][:48]] = f"FAILED: {exc}"
+
+    return results
+
+
+# The golden path, as the demo walks it. Kept here so warming and the demo script cannot
+# drift apart.
+GOLDEN_PATH: list[dict] = [
+    {"query": "Where is the nearest Potential Fishing Zone today?", "lat": 16.99, "lon": 82.24},
+    {"query": "Is it safe to go to sea tomorrow morning near Kakinada?"},
+    {"query": "Am I approaching any restricted boundary?", "lat": 9.30, "lon": 79.50},
+    {"query": "Why has fish productivity declined in this region?", "lat": 16.99, "lon": 82.24},
+    {"query": "రేపు సముద్రంలోకి వెళ్ళడం సురక్షితమేనా?", "lat": 16.99, "lon": 82.24},
+    {"query": "நாளை கடலுக்கு போகலாமா?", "lat": 13.08, "lon": 80.27},
+]

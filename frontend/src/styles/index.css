@@ -4,34 +4,151 @@
 
 /* ORCA global styles. Owner: D */
 
-html,
-body,
-#root {
-  height: 100%;
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    /* Dark mode is applied by adding `dark` to <html> — see hooks/useTheme.ts. The
+       colour-scheme hint makes native scrollbars and form controls follow suit. */
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-slate-50 text-ocean-deep antialiased transition-colors duration-300;
+  }
+
+  html.dark body {
+    @apply bg-abyss-950 text-slate-100;
+  }
+
+  /* Slim, theme-aware scrollbars. The default light-grey bar on a dark panel is the
+     single most obvious "this wasn't designed" tell. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.slate.300") transparent;
+  }
+
+  html.dark * {
+    scrollbar-color: theme("colors.abyss.800") transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-slate-300/70;
+  }
+
+  html.dark ::-webkit-scrollbar-thumb {
+    @apply bg-white/10;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ocean-400/60;
+  }
+
+  /* A visible, on-brand focus ring — keyboard users and judges both notice. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ocean-400 ring-offset-1 ring-offset-transparent;
+  }
+
+  /* Respect the OS setting. Someone with vestibular sensitivity should not have to sit
+     through a room full of animated panels. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
-body {
-  @apply antialiased text-ocean-deep;
-  /* Indic scripts need a fallback chain — a missing glyph box in the middle of a Telugu
-     answer is a demo-killer. Noto Sans covers every language we target. */
-  font-family:
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    "Noto Sans",
-    "Noto Sans Telugu",
-    "Noto Sans Tamil",
-    "Noto Sans Malayalam",
-    "Noto Sans Bengali",
-    "Noto Sans Devanagari",
-    sans-serif;
+@layer components {
+  /* Frosted panel — the repeated surface treatment across chat, cards and trace. */
+  .panel {
+    @apply border border-slate-200/80 bg-white/80 backdrop-blur-sm transition-colors duration-300;
+  }
+
+  html.dark .panel {
+    @apply border-white/10 bg-abyss-900/70;
+  }
+
+  .panel-solid {
+    @apply border border-slate-200 bg-white transition-colors duration-300;
+  }
+
+  html.dark .panel-solid {
+    @apply border-white/10 bg-abyss-900;
+  }
+
+  /* Skeleton shimmer for loading states. */
+  .shimmer {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.35) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
 }
 
 /* Leaflet must fill its container or the map renders zero-height. */
 .leaflet-container {
   height: 100%;
   width: 100%;
+  @apply bg-slate-200;
 }
 
-/* TODO(P3, D): dark mode. Only if there is time — the projector is what matters, and a
-   bright verdict card reads better in a lit room than a dark one. */
+html.dark .leaflet-container {
+  @apply bg-abyss-900;
+}
+
+/* Leaflet's own chrome is hard-coded light; restyle it rather than leaving white boxes
+   floating on a dark map. */
+html.dark .leaflet-tile-pane {
+  /* Tint OSM's light tiles toward the dark palette. Cheaper and more reliable than
+     depending on a third-party dark tile server that could be down on demo day. */
+  filter: invert(1) hue-rotate(185deg) brightness(0.92) contrast(0.9) saturate(0.75);
+}
+
+html.dark .leaflet-control-attribution,
+html.dark .leaflet-control-zoom a {
+  @apply border-white/10 bg-abyss-900/90 text-slate-300;
+}
+
+html.dark .leaflet-control-zoom a:hover {
+  @apply bg-abyss-800 text-white;
+}
+
+html.dark .leaflet-popup-content-wrapper,
+html.dark .leaflet-popup-tip {
+  @apply bg-abyss-800 text-slate-100;
+}
+
+/* Markers and overlays must NOT be inverted with the tiles, or a green fishing zone
+   renders magenta. Counter-rotate the panes that sit above the tiles. */
+html.dark .leaflet-overlay-pane,
+html.dark .leaflet-marker-pane,
+html.dark .leaflet-shadow-pane,
+html.dark .leaflet-tooltip-pane {
+  filter: none;
+}

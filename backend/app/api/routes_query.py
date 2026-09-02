@@ -14,6 +14,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from app.adapters import base as adapter_base
 from app.agents.base import discard_collector, reset_collector
 from app.graph.builder import RECURSION_LIMIT, get_graph
 from app.graph.state import PER_TURN_ACCUMULATORS, RESET
@@ -47,6 +48,7 @@ async def query(request: QueryRequest) -> OrcaResponse:
     reset_collector(request.session_id)
     # Per-request, so the response credits Bhashini only if it actually translated.
     explainability.begin_translation_tracking()
+    adapter_base.begin_tier_tracking()
 
     initial: dict = {
         "query": request.query,

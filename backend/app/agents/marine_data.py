@@ -41,6 +41,35 @@ class NoZoneDataAvailable(Exception):
     """
 
 
+class LocationNotAtSea(NoZoneDataAvailable):
+    """The query resolved to a point on land.
+
+    Its own type because it is not a failure of ours and needs different advice: nothing
+    is broken, the user simply asked about the sea from somewhere there isn't any. It is
+    also the single most common case when anyone tests from an office rather than a boat,
+    so the message has to be immediately actionable.
+    """
+
+
+async def is_inland(location: Location, radius_km: float = 40.0) -> bool:
+    """True when there is no ocean within ``radius_km`` of this point.
+
+    Uses the marine forecast grid as the test: Open-Meteo returns an all-null series over
+    land rather than an error, so "no cell with wave data nearby" is a reliable and cheap
+    land check — and it is the same signal the sea-state agent already relies on.
+    """
+    from app.adapters import open_meteo_marine
+
+    try:
+        cells = await open_meteo_marine.fetch_area(
+            location.lat, location.lon, forecast_days=1, radius_km=radius_km
+        )
+    except Exception as exc:  # noqa: BLE001 - if we cannot tell, do not claim inland
+        logger.debug("marine_data: inland check failed (%s)", exc)
+        return False
+    return not cells
+
+
 async def get_fishing_zones(location: Location, radius_km: float = 200.0) -> dict:
     """Potential Fishing Zones near a location, as GeoJSON + evidence.
 
@@ -87,12 +116,26 @@ async def get_fishing_zones(location: Location, radius_km: float = 200.0) -> dic
     proxy_features = proxy_zones.get("features") or []
 
     if not official_features and not proxy_features:
-        # Honest failure. Naming the fix is the difference between a user who can act and
-        # one who just sees "no zones found".
-        detail = proxy_error or official.get("detail") or "no data source produced zones"
+        # Honest failure — but phrased for the person reading it, not for us. The reason
+        # that matters is almost always "you are not near the sea" or "the data isn't
+        # downloaded", and internal detail (parser states, module docstrings) belongs in
+        # the trace, never in the answer.
+        if await is_inland(location):
+            raise LocationNotAtSea(
+                f"{location.name or 'That location'} is inland. Fishing zones are "
+                f"computed for coastal waters — name a port such as Kakinada, Chennai "
+                f"or Kochi, or share a location at sea."
+            )
+
+        if proxy_error and "not found at" in proxy_error:
+            raise NoZoneDataAvailable(
+                "the ocean-colour data needed to compute fishing zones has not been "
+                "downloaded yet (run scripts/fetch_copernicus_subset.py)."
+            )
+
         raise NoZoneDataAvailable(
-            f"no fishing-zone data available. {detail} "
-            f"(tried: {'; '.join(sources_tried)})"
+            "no fishing zones were found in range. No official INCOIS advisory is "
+            "available, and the satellite data showed no qualifying zone nearby."
         )
 
     features = official_features + proxy_features

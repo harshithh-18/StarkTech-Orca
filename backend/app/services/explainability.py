@@ -21,6 +21,7 @@ from __future__ import annotations
 import contextvars
 import logging
 
+from app.adapters import base as adapter_base
 from app.graph.state import OrcaState
 from app.i18n import bhashini
 from app.rag import store as rag_store
@@ -120,6 +121,25 @@ def summarise_trace(trace: list[TraceStep]) -> str:
         parts.append(f"{failed} failed")
 
     return " · ".join(parts)
+
+
+# Intents that need actual ocean under the query point.
+MARINE_INTENTS = frozenset(
+    {Intent.PFZ_LOOKUP, Intent.SAFETY_CHECK, Intent.DIAGNOSTIC, Intent.ROUTE_PLANNING}
+)
+
+
+def _is_inland_result(state: OrcaState) -> bool:
+    """Did a data specialist skip because the point is on land?
+
+    Read from the trace rather than recomputed: the specialists already made the
+    determination against the marine grid, and asking again would be a second network
+    round trip to reach the same answer.
+    """
+    for step in state.get("reasoning_trace") or []:
+        if step.agent in DATA_SPECIALISTS and "inland" in step.message.casefold():
+            return True
+    return False
 
 
 def describe_gaps(state: OrcaState, prefer: str | None = None) -> list[str]:
@@ -254,6 +274,21 @@ async def write_answer(state: OrcaState) -> str:
     evidence = state.get("evidence") or []
     verdict = state.get("verdict")
     reasons = state.get("verdict_reasons") or []
+
+    # ── Not at sea ────────────────────────────────────────────────────────
+    # By far the most common reason a marine query returns nothing: anyone testing from
+    # an office is inland. It is not a failure of ours, it outranks every other
+    # explanation, and it must not be rewritten — handed to the model it gets recast
+    # using whatever unrelated evidence is lying around ("you are not inside the EEZ").
+    if intent in MARINE_INTENTS and _is_inland_result(state):
+        location = state.get("location")
+        where = location.name if location and location.name else "That location"
+        message = (
+            f"{where} is inland, so there is no marine forecast for it. "
+            f"Name a coastal place — for example \u201cnear Kakinada\u201d, "
+            f"\u201coff Chennai\u201d or \u201cKochi\u201d — and I can answer for the water there."
+        )
+        return await translate_only(message, language_code)
 
     # ── Geofence warnings are deterministic, like the verdict ─────────────
     # Asked to "rewrite naturally", the model deleted a boundary-proximity warning and
@@ -442,6 +477,8 @@ def assemble_response(state: OrcaState) -> OrcaResponse:
         map_layers=state.get("map_layers") or [],
         alerts=state.get("alerts") or [],
         charts=state.get("charts") or [],
-        used_mock_data=bool(state.get("used_mock_data")),
+        # Badged from what the adapters actually served, not from a flag a node had to
+        # remember to set — an honesty guarantee is worthless if it depends on diligence.
+        used_mock_data=bool(state.get("used_mock_data")) or adapter_base.served_mock_data(),
         attribution=collect_attribution(state) + translation_attribution(),
     )

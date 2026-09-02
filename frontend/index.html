@@ -3,11 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#083344" />
     <title>ORCA — Marine Ecosystem Reasoning</title>
     <meta
       name="description"
       content="Ask about fishing zones, sea safety and maritime boundaries in your own language."
     />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐋</text></svg>" />
+
+    <script>
+      // Applied BEFORE first paint. Deciding the theme in React instead would flash a
+      // white screen on every load — the most visible possible polish failure, and the
+      // first thing anyone notices on a projector.
+      (function () {
+        try {
+          var stored = localStorage.getItem("orca-theme");
+          var dark =
+            stored === "dark" ||
+            (stored !== "light" &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+        } catch (e) {
+          /* private browsing — fall through to the light default */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

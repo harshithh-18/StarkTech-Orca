@@ -1,164 +1,194 @@
 # Demo Script
 
-> **Skeleton — fill in during P3 (Sep 7–9) once the real outputs exist.**
-> Rehearse three times on Sep 10. Time it: aim for **6 minutes** of demo, leaving room for
-> questions.
-
-Owner: **A**.
+**Rehearse this once end-to-end before you present.** Timings assume ~6 minutes.
 
 ---
 
-## Before you walk on stage
+## Before you leave for the venue
 
-- [ ] `ORCA_USE_MOCK_DATA=true` — or cache warmed by running all four queries once
-- [ ] Backend running on **localhost**, not the deployed URL
-- [ ] Frontend on localhost, browser zoom set for the projector
-- [ ] Wi-Fi **off** for one rehearsal to prove it survives
-- [ ] Map pre-centred on the Bay of Bengal
-- [ ] Reasoning Trace panel expanded — it's the differentiator, don't leave it collapsed
-- [ ] Second laptop with a video recording of the full demo, as a hard fallback
-- [ ] Browser tabs: app, deck, GitHub repo. Nothing else.
+Run these **on the demo machine, on good Wi-Fi**, in this order:
 
----
+```bash
+# 1. Confirm what's wired up
+python scripts/prepare_demo.py --check
 
-## Opening (30 s)
+# 2. Warm the cache against live sources, then capture mocks from it
+python scripts/prepare_demo.py
 
-> "A fisherman on the Andhra coast has three questions before he goes out: where are the
-> fish, is it safe, and am I about to cross a line I shouldn't. Today he gets those answers
-> from three different places, in English, if at all.
->
-> ORCA answers all three — in his language, on one map, and it shows him exactly why."
+# 3. Flip the safety switch
+#    .env →  ORCA_USE_MOCK_DATA=true
 
-Say what it is in one sentence: *a supervisor agent that plans a task, dispatches specialist
-agents to real marine data, and returns a verdict with its evidence.*
+# 4. Start both servers
+uvicorn app.main:app --app-dir backend          # :8000
+cd frontend && npm run dev                       # :5173
 
----
+# 5. REHEARSE WITH THE WI-FI OFF. If it works offline, nothing on stage can break it.
+```
 
-## Query 1 — "Where is the nearest fishing zone today?" (60 s)
+> ### Why mocks, and how to answer if a judge asks
+> "Mocks" here are **real responses captured from the live APIs this morning**, not
+> hand-written data. Every answer still carries its real source and timestamp, and the UI
+> badges `demo data` so nothing is presented as live when it isn't. Say that plainly if
+> asked — it is a strength, not a hedge.
 
-**Type/say:** _"Where is the nearest Potential Fishing Zone today?"_
-
-**Point at:**
-- The trace panel filling in live: `language_intent → planner → marine_data → geospatial`
-- PFZ polygons appearing on the map
-- The distance + bearing to the nearest zone
-
-**Say:** how the zone is derived — chlorophyll concentration coinciding with a sea-surface
-temperature front. _"That's not a scraped page. That's the same reasoning INCOIS itself uses."_
-
-_TODO(P3): fill in the actual numbers this returns, and the exact screen state._
+**Known limit:** the Gemini free tier is ~20 requests/day and *will* rate-limit. Groq is
+the automatic fallback and handles it, and below that a deterministic path answers with no
+model at all. This is worth demonstrating rather than hiding (see the failure beat).
 
 ---
 
-## Query 2 — the multi-turn beat (45 s)
+## The narrative
 
-**This is the moment that proves it's conversational.** Do not skip it, do not rush it.
+Open with the problem, not the architecture. **30 seconds:**
 
-**Type/say:** _"…and is it safe there?"_
-
-No location named. The agent carries the PFZ coordinates from the previous turn.
-
-**Point at:**
-- The verdict card: **GO / CAUTION / NO-GO**
-- The reason under it: *"wave height 3.4 m exceeds the 2.5 m small-craft threshold"*
-- The trace showing weather and sea-state running **in parallel**, then risk correlating them
-
-**Say:** _"The verdict is deterministic — thresholds, not a language model. The model only
-explains it. We don't let an LLM decide whether it's safe to go to sea."_
-
-_TODO(P3): confirm the follow-up reliably resolves context. This is the highest-risk moment
-in the demo — rehearse it more than anything else._
+> "A fisherman leaving harbour at 4 a.m. has three questions: where are the fish, is it
+> safe, and am I about to cross a line that gets my boat impounded. The data to answer all
+> three is public — and completely unusable to him. It's in NetCDF files, English-only
+> government portals, and satellite products. ORCA answers those questions in his own
+> language, and shows its working."
 
 ---
 
-## Query 3 — the language switch (60 s)
+## Query 1 — Nearest fishing zone · 60s
 
-**Ask a safety question in Telugu or Tamil.**
+Type: **"Where is the nearest Potential Fishing Zone today?"**
 
-> రేపు ఉదయం సముద్రంలోకి వెళ్ళడం సురక్షితమేనా?
+Point at the map as the zones draw, then at the trace panel.
 
-**Point at:** the answer coming back in the same language — verdict card, reasons and all.
+> "That zone wasn't scraped from anywhere. INCOIS — the official source — has no usable
+> API; we checked, and the advisory page is a client-rendered shell. So we compute the
+> zones the same way INCOIS does: high chlorophyll-a where it meets a sea-surface
+> temperature front. Click a zone and it tells you the two numbers that qualified it."
 
-**Say:** _"Language detection and response are through Bhashini, the Government of India's
-own national language stack. Same stack, same government, same users."_
-
-_TODO(P3): pick the exact sentence and verify the round-trip. Have a Telugu speaker on the
-team read the output aloud and confirm it isn't awkward — a bad translation on stage is worse
-than English._
+**Click a zone polygon** to show the popup with chlorophyll and gradient.
 
 ---
 
-## Query 4 — boundary proximity (45 s)
+## Query 2 — Is it safe? · 90s · *the core*
 
-**Type/say:** _"Am I approaching any restricted boundary?"_
+Type: **"Is it safe to go to sea tomorrow morning near Kakinada?"**
 
-**Point at:** the alert banner, the IMBL line on the map, the distance to it.
+Let the verdict card land. Then the point that matters most:
 
-**Say:** why this matters — crossing the International Maritime Boundary Line is what gets
-boats detained. This is the alert with real consequences attached.
+> "The verdict is **not** from the language model. It's a deterministic rule engine
+> comparing forecast values against small-craft thresholds. The model only phrases it in
+> the user's language, and it is never allowed to change or soften a verdict. A
+> hallucinated 'safe to go' could kill someone — so the model is never in that decision."
 
-_TODO(P3): choose a demo coordinate close enough to a boundary to trigger the alert._
+Then the detail that shows real domain thinking:
 
----
+> "One thing we found building this: sampling wave height at the harbour reads about a
+> third of what it is 25 km offshore where the boat actually fishes — and the caution
+> threshold sits between the two. So we sample a ring of points offshore and report the
+> worst, and we show you which point it came from."
 
-## Query 5 — the reasoning showcase (60 s)
-
-**Type/say:** _"Why has fish productivity declined in this region?"_
-
-This one exists to show **reasoning depth**, not lookup. Chlorophyll trend chart, SST
-anomaly, a narrative that connects them.
-
-**Point at:** the chart, and the evidence citations underneath with sources and timestamps.
-
-_TODO(P3): confirm the narrative is defensible. A judge may well be an oceanographer._
+Expand **Why?** on the message to show the evidence list.
 
 ---
 
-## Close (45 s)
+## Query 3 — Boundary proximity · 60s
 
-Pull up the trace panel one more time and scroll it.
+Type: **"Am I approaching any restricted boundary?"**
 
-> "Every number on this screen has a source and a timestamp. Every answer shows the agents
-> that produced it and the rule that fired. That's the difference between a chatbot that
-> sounds confident and a system a fisherman can actually bet his boat on."
+Best shown near the Sri Lanka boundary (Palk Strait). The red banner fires.
 
-Mention, briefly: built entirely on free and open data — Open-Meteo, Copernicus, INCOIS —
-so it costs nothing to run at scale.
+> "This is the alert that matters most. Crossing the International Maritime Boundary Line
+> is what gets Indian boats detained by a neighbouring coast guard. We alert on *approach*,
+> not on breach — a warning after the crossing is worthless."
 
----
-
-## Anticipated questions
-
-| Question | Answer |
-|----------|--------|
-| "Is this live data?" | Yes — Open-Meteo and Copernicus, live. Cached for demo reliability, and the UI badges when it's cached. *(Never claim live if you're on mocks.)* |
-| "Where does the fishing zone come from?" | INCOIS advisories where available, plus our own chlorophyll + SST-front computation from Copernicus. Two independent sources. |
-| "How accurate is the cyclone/lightning data?" | **Be honest:** lightning is a modelled proxy from thunderstorm probability, not an IMD lightning observation. We flag it in the evidence. |
-| "Why not just one big LLM prompt?" | Five specialist agents with a deterministic risk layer. The safety verdict never comes from a language model. |
-| "How many languages?" | Ten via Bhashini; demoed in Telugu/Tamil; the four coastal languages are the priority. |
-| "What's not built?" | Route optimisation and voice are architected and stubbed. Say so plainly — pointing at a clean stub reads better than bluffing. |
+If asked why the EEZ doesn't warn: being inside India's own EEZ is the normal lawful
+state, and international waters are lawful too. Only an IMBL crossing or a protected area
+is a breach. **We deliberately removed baselines from the alert set** — they hug the coast
+and would fire at every harbour, training the user to ignore the warning that counts.
 
 ---
 
-## If something breaks
+## Query 4 — Why fewer fish? · 60s
 
-1. **Don't apologise twice.** Say "let me show you this from the cache" and move on.
-2. **A partial answer is a feature.** If a data source drops out, the trace shows a `skipped`
-   step with the reason — point at it: *"that's the degradation path working."*
-3. **Video fallback** on the second laptop if the app won't start at all.
-4. **Never** debug live in front of judges. Move to the next query.
+Type: **"Why has fish productivity declined in this region?"**
+
+This is the beat that shows integrity. The data may well contradict the question:
+
+> "Notice what it did — the question assumes a decline, and the data says chlorophyll has
+> actually *risen* 160%, because we're in the monsoon bloom. It contradicts the premise
+> rather than inventing a decline to match. It also says exactly what it compared against:
+> recent weeks versus the preceding period, not a multi-year seasonal normal, because the
+> product we read doesn't have that history."
 
 ---
 
-## Timing
+## The multilingual beat · 45s
 
-| Segment | Target |
-|---------|--------|
-| Opening | 0:30 |
-| Query 1 — PFZ | 1:00 |
-| Query 2 — multi-turn safety | 0:45 |
-| Query 3 — language switch | 1:00 |
-| Query 4 — boundary | 0:45 |
-| Query 5 — reasoning | 1:00 |
-| Close | 0:45 |
-| **Total** | **~5:45** |
+Type the Telugu query: **రేపు సముద్రంలోకి వెళ్ళడం సురక్షితమేనా?**
+
+> "Same engine, same deterministic verdict, answered in Telugu. Every number is preserved
+> exactly — the model translates the verdict, it never rewrites it."
+
+If Bhashini credentials are configured, add:
+
+> "Translation is going through Bhashini, the Government of India's own language stack —
+> on a government problem statement, using the government's own AI infrastructure."
+
+---
+
+## Multi-turn · 30s
+
+Ask query 1, then: **"…and is it safe there?"**
+
+> "It resolved 'there' from the previous turn. The conversation has memory, keyed by
+> session."
+
+---
+
+## The failure beat — rehearse this · 30s
+
+**Practise what you say when something degrades**, because something will.
+
+Every answer that couldn't use a source says so in the trace with a `skipped` step naming
+the reason. If a judge sees one:
+
+> "That's the system telling you what it *couldn't* check. It answered with what it had and
+> told you what was missing, rather than quietly answering with less. For a safety tool,
+> knowing what you don't know is the whole point."
+
+If the LLM rate-limits mid-demo, the answer comes back in English with the correct verdict.
+Say so:
+
+> "That's the free tier rate-limiting. The verdict is unaffected — it's deterministic. We
+> lost the translation, not the answer."
+
+---
+
+## Closing · 30s
+
+> "Four queries, in five languages, on live public data — with every number sourced and
+> every agent's step visible. The three things we'd never cut are on screen right now: the
+> reasoning trace, the evidence array, and the map."
+
+---
+
+## If asked
+
+**"Why 2.5 metres?"** — Provisional small-craft thresholds; they are in one tested pure
+function, sourced and cited before production use. Say it's provisional; don't invent a
+source.
+
+**"Is the lightning real?"** — No, and we label it. It's CAPE, a modelled measure of
+atmospheric instability, not an observed strike. That label is in the evidence string.
+
+**"What's actually agentic here?"** — Show the trace: a planner chooses which specialists
+to dispatch per query, they run in parallel, and a risk node correlates them. Different
+questions dispatch different agents; you can see it happen live.
+
+**"What if a data source is down?"** — Every adapter cascades live → cache → mock, and no
+source can produce a 500. Offer to show it: the trace will name the skipped agent.
+
+---
+
+## Do not
+
+- Do not demo on a cold live API call.
+- Do not claim the lightning proxy is an observation.
+- Do not claim the productivity trend is a climatological anomaly.
+- Do not say "the AI decides if it's safe" — the rule engine does, and that distinction is
+  the strongest thing you have to say.

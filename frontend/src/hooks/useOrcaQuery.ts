@@ -29,12 +29,16 @@ export interface UseOrcaQueryOptions {
   /** Session id to use. Must be the SAME id the trace socket subscribed to, or the live
    *  trace panel silently listens to a session nobody is publishing to. */
   sessionId?: string;
+  /** Where to ask about. Explicit rather than implicit device GPS: anyone testing indoors
+   *  is inland, where there is no marine forecast and every query correctly returns
+   *  nothing. See components/LocationPicker.tsx. */
+  location?: { lat: number; lon: number } | null;
   onResponse?: (response: OrcaResponse) => void;
   onAskStart?: () => void;
 }
 
 export function useOrcaQuery(options: UseOrcaQueryOptions = {}): UseOrcaQuery {
-  const { sessionId: providedSessionId, onResponse, onAskStart } = options;
+  const { sessionId: providedSessionId, location, onResponse, onAskStart } = options;
   const [sessionId, setSessionId] = useState(() => providedSessionId ?? newSessionId());
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [latest, setLatest] = useState<OrcaResponse | null>(null);
@@ -42,8 +46,11 @@ export function useOrcaQuery(options: UseOrcaQueryOptions = {}): UseOrcaQuery {
   const [error, setError] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
 
-  // Kept in a ref so `ask` doesn't need to be rebuilt when the position arrives.
+  // Kept in a ref so `ask` doesn't need to be rebuilt when the position or the picked
+  // location changes.
   const coordsRef = useRef<{ lat: number; lon: number } | null>(null);
+  const locationRef = useRef<{ lat: number; lon: number } | null>(null);
+  locationRef.current = location ?? null;
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -72,8 +79,10 @@ export function useOrcaQuery(options: UseOrcaQueryOptions = {}): UseOrcaQuery {
         const response = await postQuery({
           query: text,
           session_id: sessionId,
-          lat: coordsRef.current?.lat ?? null,
-          lon: coordsRef.current?.lon ?? null,
+          // Only the explicitly chosen location is sent. Device GPS reaches here by
+          // being *selected* in the picker, never by default.
+          lat: locationRef.current?.lat ?? null,
+          lon: locationRef.current?.lon ?? null,
         });
 
         setLatest(response);

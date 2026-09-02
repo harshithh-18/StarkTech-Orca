@@ -30,6 +30,7 @@ the trace can say so. We degrade honestly; we never silently fake.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
@@ -49,6 +50,36 @@ logger = logging.getLogger(__name__)
 DEFAULT_TIMEOUT_SECONDS = 10.0
 
 _client: httpx.AsyncClient | None = None
+
+# Which cascade rungs served this request. The response has to badge `used_mock_data`
+# honestly — "we degrade honestly, we never silently fake data" is the whole contract —
+# but agents call adapters for Evidence and discard the tier, so it is recorded here
+# instead. A ContextVar, not a global: requests run concurrently on one event loop and a
+# global would badge one user's answer with another's fallback.
+_tiers_used: contextvars.ContextVar[set[str] | None] = contextvars.ContextVar(
+    "orca_tiers_used", default=None
+)
+
+
+def begin_tier_tracking() -> None:
+    """Start recording cascade rungs for the current request."""
+    _tiers_used.set(set())
+
+
+def _record_tier(tier: DataTier) -> None:
+    used = _tiers_used.get()
+    if used is not None:
+        used.add(tier.value)
+
+
+def tiers_used() -> set[str]:
+    """Rungs that served data on this request ('live', 'cache', 'mock')."""
+    return set(_tiers_used.get() or set())
+
+
+def served_mock_data() -> bool:
+    """True when ANY adapter fell back to a canned response on this request."""
+    return "mock" in tiers_used()
 
 
 class AdapterError(Exception):
@@ -135,6 +166,7 @@ async def fetch_with_cascade(
         mocked = cache.get_mock(key)
         if mocked is not None:
             logger.info("cascade[%s]: ORCA_USE_MOCK_DATA is on → serving MOCK", key)
+            _record_tier(DataTier.MOCK)
             return AdapterResult(mocked, DataTier.MOCK, source)
         logger.warning(
             "cascade[%s]: ORCA_USE_MOCK_DATA is on but no mock exists — falling through "
@@ -146,12 +178,14 @@ async def fetch_with_cascade(
     fresh = cache.get(key, max_age_seconds=ttl)
     if fresh is not None:
         logger.debug("cascade[%s]: fresh cache hit", key)
+        _record_tier(DataTier.CACHE)
         return AdapterResult(fresh, DataTier.CACHE, source)
 
     # ── Rung 1: live ──────────────────────────────────────────────────────
     try:
         payload = await fetch_live()
         cache.put(key, payload)
+        _record_tier(DataTier.LIVE)
         return AdapterResult(
             payload, DataTier.LIVE, source, fetched_at=datetime.now(timezone.utc)
         )
@@ -167,12 +201,14 @@ async def fetch_with_cascade(
         logger.warning(
             "cascade[%s]: serving STALE cache (%.0f min old)", key, age / 60
         )
+        _record_tier(DataTier.CACHE)
         return AdapterResult(stale, DataTier.CACHE, source)
 
     # ── Rung 3: mock ──────────────────────────────────────────────────────
     mocked = cache.get_mock(key)
     if mocked is not None:
         logger.warning("cascade[%s]: serving MOCK — no live and no cache", key)
+        _record_tier(DataTier.MOCK)
         return AdapterResult(mocked, DataTier.MOCK, source)
 
     # Every rung is exhausted. The caller catches this and emits a `skipped` trace step;

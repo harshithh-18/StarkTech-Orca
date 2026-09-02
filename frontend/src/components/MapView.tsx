@@ -21,6 +21,7 @@ interface Props {
   center: Location | null;
   activeLayers: MapLayer[];
   userLocation?: Location | null;
+  isDark?: boolean;
 }
 
 // Leaflet's default marker icons are resolved by relative URL and break under a bundler.
@@ -41,10 +42,11 @@ const DEFAULT_ZOOM = 8;
 
 /** Per-layer styling. The IMBL is the one with consequences, so it is the loudest. */
 const LAYER_STYLE: Partial<Record<MapLayer, L.PathOptions>> = {
-  eez_boundary: { color: "#2563eb", weight: 2, fillOpacity: 0.05, dashArray: "6 4" },
-  imbl_line: { color: "#b91c1c", weight: 3, fillOpacity: 0 },
-  mpa_zones: { color: "#7c3aed", weight: 2, fillOpacity: 0.15 },
-  pfz_zones: { color: "#15803d", weight: 2, fillOpacity: 0.35 },
+  eez_boundary: { color: "#38bdf8", weight: 2, fillOpacity: 0.06, dashArray: "6 4" },
+  // The IMBL is the boundary with consequences, so it is the loudest thing on the map.
+  imbl_line: { color: "#f43f5e", weight: 3.5, fillOpacity: 0 },
+  mpa_zones: { color: "#a78bfa", weight: 2, fillOpacity: 0.18 },
+  pfz_zones: { color: "#22c55e", weight: 2, fillOpacity: 0.35 },
 };
 
 /** Layers served as GeoJSON polygons/lines from the backend. */
@@ -189,7 +191,7 @@ function LayerData({ layer, center }: { layer: MapLayer; center: Location | null
   );
 }
 
-export default function MapView({ center, activeLayers, userLocation }: Props) {
+export default function MapView({ center, activeLayers, userLocation, isDark = false }: Props) {
   const pin = userLocation ?? center;
 
   return (
@@ -240,8 +242,13 @@ export default function MapView({ center, activeLayers, userLocation }: Props) {
               verdict's "25 km offshore" reading has a visible footprint. */}
           <CircleMarker
             center={[pin.lat, pin.lon]}
-            radius={28}
-            pathOptions={{ color: "#12507a", weight: 1, fillOpacity: 0.06 }}
+            radius={30}
+            pathOptions={{
+              color: isDark ? "#22d3ee" : "#0891b2",
+              weight: 1.5,
+              fillColor: isDark ? "#22d3ee" : "#06b6d4",
+              fillOpacity: 0.08,
+            }}
           />
         </>
       )}

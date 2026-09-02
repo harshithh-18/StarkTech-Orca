@@ -22,60 +22,75 @@ interface Props {
 interface AlertStyle {
   /** Plain language — "HIGH_WAVE" means nothing to a fisherman. */
   text: string;
+  icon: string;
   className: string;
   /** Life-safety alerts cannot be dismissed. */
   dismissible: boolean;
   /** Lower sorts first. */
   severity: number;
+  /** Draw attention on arrival; reserved for the alerts that carry real consequence. */
+  urgent?: boolean;
 }
 
 const ALERTS: Record<AlertType, AlertStyle> = {
   TSUNAMI: {
     text: "Tsunami warning in force — follow official instructions immediately.",
-    className: "bg-red-700 text-white",
+    icon: "🌊",
+    className: "bg-gradient-to-r from-red-700 to-rose-700 text-white",
     dismissible: false,
     severity: 0,
+    urgent: true,
   },
   CYCLONE: {
     text: "Cyclone warning for this area. Do not put to sea.",
-    className: "bg-red-700 text-white",
+    icon: "🌀",
+    className: "bg-gradient-to-r from-red-700 to-rose-600 text-white",
     dismissible: false,
     severity: 1,
+    urgent: true,
   },
   GEOFENCE_BREACH: {
     text: "You are inside a restricted maritime zone. Leave the area.",
-    className: "bg-red-600 text-white",
+    icon: "⛔",
+    className: "bg-gradient-to-r from-rose-600 to-red-600 text-white",
     dismissible: false,
     severity: 2,
+    urgent: true,
   },
   GEOFENCE_PROXIMITY: {
-    text: "You are approaching a restricted maritime boundary. Crossing it can lead to detention.",
-    className: "bg-orange-600 text-white",
+    text: "Approaching an international maritime boundary — crossing it can lead to detention.",
+    icon: "🚩",
+    className: "bg-gradient-to-r from-orange-600 to-amber-600 text-white",
     dismissible: true,
     severity: 3,
+    urgent: true,
   },
   HIGH_WAVE: {
     text: "High waves forecast — conditions exceed small-craft limits.",
-    className: "bg-amber-600 text-white",
+    icon: "🌊",
+    className: "bg-gradient-to-r from-amber-600 to-orange-500 text-white",
     dismissible: true,
     severity: 4,
   },
   HIGH_WIND: {
     text: "Strong winds forecast — conditions exceed small-craft limits.",
-    className: "bg-amber-600 text-white",
+    icon: "💨",
+    className: "bg-gradient-to-r from-amber-600 to-yellow-500 text-white",
     dismissible: true,
     severity: 5,
   },
   LIGHTNING: {
     // Labelled as an estimate: this is CAPE, a modelled proxy, not an observed strike.
     text: "Thunderstorm risk (modelled estimate, not an observed lightning report).",
-    className: "bg-amber-500 text-white",
+    icon: "⚡",
+    className: "bg-gradient-to-r from-amber-500 to-yellow-500 text-white",
     dismissible: true,
     severity: 6,
   },
   MARINE_HEAT_WAVE: {
     text: "Marine heat wave conditions reported in this area.",
-    className: "bg-orange-500 text-white",
+    icon: "🌡️",
+    className: "bg-gradient-to-r from-orange-500 to-amber-500 text-white",
     dismissible: true,
     severity: 7,
   },
@@ -93,16 +108,27 @@ export default function AlertBanner({ alerts, onDismiss }: Props) {
   if (visible.length === 0) return null;
 
   return (
-    <div role="alert">
+    <div role="alert" className="shrink-0">
       {visible.map((alert) => {
         const style = ALERTS[alert];
         return (
           <div
             key={alert}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium ${style.className}`}
+            className={`flex animate-slide-up items-center gap-2.5 px-4 py-2 text-sm font-semibold shadow-md ${style.className}`}
           >
-            <span aria-hidden="true">⚠</span>
-            <span className="flex-1">{style.text}</span>
+            <span aria-hidden="true" className="text-base">
+              {style.icon}
+            </span>
+
+            {style.urgent && (
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-pulse-ring rounded-full bg-white" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+              </span>
+            )}
+
+            <span className="flex-1 leading-snug">{style.text}</span>
+
             {style.dismissible && (
               <button
                 type="button"
@@ -111,7 +137,7 @@ export default function AlertBanner({ alerts, onDismiss }: Props) {
                   setDismissed((current) => [...current, alert]);
                   onDismiss?.(alert);
                 }}
-                className="shrink-0 rounded px-1.5 text-lg leading-none opacity-80 hover:opacity-100"
+                className="shrink-0 rounded-lg px-2 text-lg leading-none opacity-75 transition-all hover:scale-110 hover:bg-white/20 hover:opacity-100"
               >
                 ×
               </button>

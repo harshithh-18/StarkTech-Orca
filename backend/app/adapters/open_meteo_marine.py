@@ -189,8 +189,8 @@ async def get_sea_state_evidence(
     cells = await fetch_area(lat, lon)
     if not cells:
         raise AdapterError(
-            f"no marine grid cell with data within {SAMPLE_RADIUS_KM:.0f} km of "
-            f"{lat:.3f},{lon:.3f} — the location appears to be inland"
+            f"no sea within {SAMPLE_RADIUS_KM:.0f} km of this location — it appears to "
+            f"be inland"
         )
 
     # For each field, keep the worst reading found anywhere in the sampled area.
