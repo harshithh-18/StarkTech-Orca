@@ -49,11 +49,34 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MARINE_REGIONS_URL = "https://www.marineregions.org/downloads.php"
 PROTECTED_PLANET_URL = "https://www.protectedplanet.net/country/IND"
 
+# Marine Regions' own public GeoServer. EEZ and boundary lines come straight from here,
+# so those two layers need no manual download at all — only WDPA still does.
+WFS_URL = "https://geo.vliz.be/geoserver/MarineRegions/wfs"
+
 OUTPUTS = {
     "eez": "india_eez.geojson",
     "imbl": "india_imbl.geojson",
     "mpa": "india_mpa.geojson",
 }
+
+# ── Which boundary lines count as "the IMBL" ──────────────────────────────
+# Marine Regions returns 32 line features for India, and they are NOT interchangeable:
+#
+#   Treaty / Median line / Court ruling  → agreed boundaries with a NEIGHBOURING STATE.
+#                                          These are the lines that get boats detained.
+#   200 NM                               → the outer edge of the EEZ facing the high seas.
+#                                          Crossing it is not an arrest risk, and the
+#                                          `inside_eez` check already covers leaving
+#                                          Indian waters.
+#   Straight baseline                    → the coastal reference line the territorial sea
+#                                          is measured FROM. It hugs the shore, so
+#                                          including it would put a "boundary" a few km
+#                                          from every fishing harbour and fire a proximity
+#                                          alert on essentially every query.
+#   Connection line                      → cartographic joins between segments.
+#
+# Only the first group goes into india_imbl.geojson.
+IMBL_LINE_TYPES = {"Treaty", "Median line", "Court ruling"}
 
 # Property names that identify India across the two products' differing schemas.
 _INDIA_FIELDS = ("SOVEREIGN1", "TERRITORY1", "GEONAME", "ISO_SOV1", "ISO3", "PARENT_ISO")
@@ -72,6 +95,86 @@ def _is_marine(properties: dict) -> bool:
     """WDPA marks marine areas in a MARINE field: '1' partial, '2' fully marine."""
     marine = properties.get("MARINE")
     return marine is not None and str(marine).strip() in {"1", "2", "true", "True"}
+
+
+def _wfs_features(type_name: str, cql: str, timeout: int = 240) -> list[dict]:
+    """GetFeature against the Marine Regions WFS, returned as GeoJSON features."""
+    import urllib.parse
+    import urllib.request
+
+    query = urllib.parse.urlencode(
+        {
+            "service": "WFS",
+            "version": "1.0.0",
+            "request": "GetFeature",
+            "typeName": type_name,
+            "outputFormat": "application/json",
+            "CQL_FILTER": cql,
+        }
+    )
+    request = urllib.request.Request(
+        f"{WFS_URL}?{query}", headers={"User-Agent": "ORCA/0.2 (marine advisory prototype)"}
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+
+    # GeoServer reports errors as an XML ServiceExceptionReport, which json.loads would
+    # already have rejected — so anything reaching here is well-formed GeoJSON.
+    return payload.get("features", [])
+
+
+def fetch_marine_regions(out_dir: Path) -> dict[str, int]:
+    """Download India's EEZ and maritime boundary lines from the public WFS."""
+    written: dict[str, int] = {}
+
+    print("\nMarine Regions WFS (public — no form needed)")
+    print(f"  {WFS_URL}")
+
+    # ── EEZ polygons ──────────────────────────────────────────────────────
+    try:
+        print("  fetching EEZ polygons… (a few MB, ~30 s)")
+        features = _wfs_features("MarineRegions:eez", "sovereign1='India'")
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ! EEZ fetch failed: {exc}")
+        features = []
+
+    if features:
+        for feature in features:
+            props = feature.get("properties") or {}
+            print(f"     {props.get('geoname','?')[:56]:58} {props.get('area_km2','?')} km²")
+        _write(features, out_dir / OUTPUTS["eez"], "eez")
+        written["eez"] = len(features)
+
+    # ── Boundary lines ────────────────────────────────────────────────────
+    try:
+        print("  fetching maritime boundary lines…")
+        lines = _wfs_features(
+            "MarineRegions:eez_boundaries",
+            "sovereign1='India' OR sovereign2='India'",
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ! boundary fetch failed: {exc}")
+        lines = []
+
+    if lines:
+        keep = [
+            line
+            for line in lines
+            if (line.get("properties") or {}).get("line_type") in IMBL_LINE_TYPES
+        ]
+        dropped = len(lines) - len(keep)
+        print(
+            f"     {len(lines)} lines → keeping {len(keep)} international boundaries, "
+            f"dropping {dropped} (200 NM limits, straight baselines, connection lines)"
+        )
+        for line in keep:
+            props = line["properties"]
+            print(f"       {str(props.get('line_name'))[:52]:54} {props.get('line_type')}")
+        if keep:
+            _write(keep, out_dir / OUTPUTS["imbl"], "imbl")
+            written["imbl"] = len(keep)
+
+    return written
 
 
 def _read_features(path: Path) -> list[dict]:
@@ -179,19 +282,20 @@ def sanity_check(out_dir: Path) -> None:
     print(f"  mid-ocean     (70.0E, 20.0S) inside EEZ: {geometry.contains(outside)}  (expect False)")
 
 
-def print_instructions(raw_dir: Path) -> None:
-    print("\nNothing to convert — no source files found in:")
-    print(f"  {raw_dir}\n")
-    print("Both sources need a manual download (each is behind a terms form):\n")
-    print("  1. EEZ + IMBL — Marine Regions")
-    print(f"     {MARINE_REGIONS_URL}")
-    print("     → Maritime Boundaries → World EEZ v12 (GeoJSON or shapefile)\n")
-    print("  2. Marine Protected Areas — Protected Planet (WDPA)")
-    print(f"     {PROTECTED_PLANET_URL}")
-    print("     → Download → accept the terms\n")
-    print(f"Drop the downloaded files into {raw_dir} and run this script again.")
-    print("It will filter to India and write india_eez / india_imbl / india_mpa.geojson.\n")
-    print("⚠️  WDPA prohibits redistribution — data/ is gitignored, never commit these.")
+def print_mpa_instructions(raw_dir: Path) -> None:
+    """WDPA is the one layer that still needs a human.
+
+    Its licence has to be accepted by the person using the data — not clicked through by
+    a script on their behalf.
+    """
+    print("\nMarine Protected Areas — optional, still manual")
+    print(f"  {PROTECTED_PLANET_URL}")
+    print("  → Download → accept the terms → drop the zip into:")
+    print(f"     {raw_dir}")
+    print("  then re-run this script; it filters to India's marine designations.\n")
+    print("  ⚠️  WDPA prohibits redistribution — data/ is gitignored, never commit it.")
+    print("  Geofencing works without it: EEZ containment and IMBL proximity are the two")
+    print("  checks that carry real legal consequence.")
 
 
 def main() -> None:
@@ -201,6 +305,8 @@ def main() -> None:
     parser.add_argument("--out-dir", default=str(REPO_ROOT / "data" / "geojson"))
     parser.add_argument("--raw-dir", default=None,
                         help="where the manually-downloaded files are (default: <out-dir>/raw)")
+    parser.add_argument("--skip-wfs", action="store_true",
+                        help="don't hit Marine Regions; only convert files in --raw-dir")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -212,19 +318,31 @@ def main() -> None:
     print(f"raw input : {raw_dir}")
     print(f"output    : {out_dir}")
 
-    written = convert(raw_dir, out_dir)
+    written: dict[str, int] = {}
+
+    # EEZ + IMBL come from the public WFS; no form, no manual step.
+    if not args.skip_wfs:
+        written.update(fetch_marine_regions(out_dir))
+
+    # Anything dropped in raw/ by hand (WDPA, or a manual EEZ download) is converted too.
+    written.update(convert(raw_dir, out_dir))
 
     if not written:
-        print_instructions(raw_dir)
+        print("\nNothing downloaded and nothing to convert.")
+        print_mpa_instructions(raw_dir)
         raise SystemExit(1)
 
     sanity_check(out_dir)
 
     missing = [name for name, filename in OUTPUTS.items() if not (out_dir / filename).exists()]
+    if "mpa" in missing:
+        print_mpa_instructions(raw_dir)
     if missing:
-        print(f"\nStill missing: {', '.join(missing)}. Geofencing will report those as skipped.")
-    else:
-        print("\nAll three layers present — golden query #3 (geofencing) is now live.")
+        print(f"\nMissing: {', '.join(missing)} — those checks report as skipped.")
+    if not missing:
+        print("\nAll three layers present — golden query #3 (geofencing) is fully live.")
+    elif missing == ["mpa"]:
+        print("\nEEZ + IMBL are in place — golden query #3 (geofencing) is live.")
 
 
 if __name__ == "__main__":

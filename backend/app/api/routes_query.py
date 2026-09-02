@@ -45,6 +45,8 @@ async def query(request: QueryRequest) -> OrcaResponse:
 
     # Fresh collector per turn so seq restarts at 0 and the panel doesn't bleed turns.
     reset_collector(request.session_id)
+    # Per-request, so the response credits Bhashini only if it actually translated.
+    explainability.begin_translation_tracking()
 
     initial: dict = {
         "query": request.query,

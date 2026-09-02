@@ -18,14 +18,46 @@ doesn't know, which is exactly what "evidence-based" means.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 
 from app.graph.state import OrcaState
-from app.schemas.enums import Intent, Language, TraceStatus, Verdict
+from app.i18n import bhashini
+from app.rag import store as rag_store
+from app.schemas.enums import AlertType, Intent, Language, TraceStatus, Verdict
 from app.schemas.response import Evidence, OrcaResponse, TraceStep
 from app.services import llm
 
 logger = logging.getLogger(__name__)
+
+# Agents that fetch data. A skip from one of these means the answer is genuinely missing
+# something; a skip from risk/visualization/explainability is control flow, not a gap.
+DATA_SPECIALISTS = frozenset({"weather", "sea_state", "marine_data", "geospatial"})
+
+# Which translator actually served this request, so the response credits Bhashini only
+# when it really ran and not when we fell back. A ContextVar rather than a module global:
+# requests run concurrently on one event loop and a global would attribute one user's
+# translation to another's answer.
+_translator_used: contextvars.ContextVar[set[str] | None] = contextvars.ContextVar(
+    "orca_translator_used", default=None
+)
+
+
+def begin_translation_tracking() -> None:
+    """Start recording which translators run, for the current request only."""
+    _translator_used.set(set())
+
+
+def _record_translator(name: str) -> None:
+    used = _translator_used.get()
+    if used is not None:
+        used.add(name)
+
+
+def translation_attribution() -> list[str]:
+    """Licence lines for the translators that actually ran on this request."""
+    used = _translator_used.get() or set()
+    return [bhashini.ATTRIBUTION] if "bhashini" in used else []
 
 
 def dedupe_evidence(evidence: list[Evidence]) -> list[Evidence]:
@@ -102,13 +134,109 @@ def describe_gaps(state: OrcaState, prefer: str | None = None) -> list[str]:
     """
     gaps = []
     for step in state.get("reasoning_trace") or []:
-        if step.status in (TraceStatus.SKIPPED, TraceStatus.FAILED):
-            gaps.append((step.agent, f"{step.agent.replace('_', ' ')}: {step.message}"))
+        if step.status not in (TraceStatus.SKIPPED, TraceStatus.FAILED):
+            continue
+        # Only a data specialist failing is a gap the user needs to hear about. The risk
+        # node skipping a non-safety question is by design, not a shortfall — reporting
+        # it reads as an apology for working correctly.
+        if step.agent not in DATA_SPECIALISTS:
+            continue
+        gaps.append((step.agent, f"{step.agent.replace('_', ' ')}: {step.message}"))
 
     if prefer:
         gaps.sort(key=lambda pair: pair[0] != prefer)
 
     return [text for _, text in gaps]
+
+
+# Below this Chroma distance a hit is close enough to answer with. Above it, the FAQ has
+# nothing relevant and the capability blurb is the honest response — a loosely-related
+# passage dressed up as an answer is worse than saying "I can help with these four things".
+MAX_RETRIEVAL_DISTANCE = 1.1
+
+
+def retrieve_background(query: str) -> str | None:
+    """Answer a general marine question from the knowledge store, with its citation.
+
+    Returns None when retrieval is unavailable or nothing is close enough — the caller
+    then falls back to describing what ORCA can do.
+    """
+    if not query.strip():
+        return None
+
+    try:
+        hits = rag_store.search(query, n_results=2)
+    except Exception as exc:  # noqa: BLE001 - retrieval is never load-bearing
+        logger.warning("explainability: retrieval failed (%s)", exc)
+        return None
+
+    if not hits:
+        return None
+
+    best = hits[0]
+    distance = best.get("distance")
+    if distance is not None and distance > MAX_RETRIEVAL_DISTANCE:
+        logger.debug(
+            "explainability: closest passage was %.2f away — too loose to answer with",
+            distance,
+        )
+        return None
+
+    # Strip the markdown heading; the section name is cited separately.
+    body = "\n".join(
+        line for line in best["text"].splitlines() if not line.strip().startswith("#")
+    ).strip()
+
+    section = best.get("section") or ""
+    citation = f" (ORCA knowledge base: {section})" if section else ""
+    return f"{body}{citation}"
+
+
+async def translate_only(text: str, language_code: str) -> str:
+    """Translate a fixed string, preserving its meaning and urgency exactly.
+
+    For text the model is not permitted to rewrite — safety warnings and the productivity
+    narrative. Falls back to the original English rather than risking a softened
+    translation: an English warning the user can still read beats a translated one that
+    no longer warns.
+
+    Order: **Bhashini first**, then the LLM, then English. Bhashini is the Government of
+    India's own Indic stack and is the right primary for a government problem statement;
+    the LLM sits behind it so a Bhashini outage cannot take the multilingual story down.
+    """
+    if language_code == "en":
+        return text
+
+    # ── Bhashini (Government of India NMT) ────────────────────────────────
+    if bhashini.available() and bhashini.supports("en", language_code):
+        try:
+            translated = await bhashini.translate(text, "en", language_code)
+            logger.debug("explainability: translated via Bhashini → %s", language_code)
+            _record_translator("bhashini")
+            return translated
+        except Exception as exc:  # noqa: BLE001 - fall through to the LLM
+            logger.warning(
+                "explainability: Bhashini translation failed (%s) — falling back to the LLM",
+                exc,
+            )
+
+    if not llm.available():
+        return text
+
+    system = (
+        f"Translate the user's text into the language with ISO 639-1 code "
+        f"'{language_code}'. Output ONLY the translation.\n"
+        f"This is a maritime SAFETY WARNING. Preserve every number, place name and unit "
+        f"exactly. Preserve the urgency — if it warns, the translation must warn just as "
+        f"strongly. Do not add, remove, soften or explain anything."
+    )
+    try:
+        translated = await llm.complete(text, system=system, temperature=0.1)
+        if isinstance(translated, str) and translated.strip():
+            return translated.strip()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("explainability: warning translation failed (%s)", exc)
+    return text
 
 
 async def write_answer(state: OrcaState) -> str:
@@ -126,6 +254,30 @@ async def write_answer(state: OrcaState) -> str:
     evidence = state.get("evidence") or []
     verdict = state.get("verdict")
     reasons = state.get("verdict_reasons") or []
+
+    # ── Geofence warnings are deterministic, like the verdict ─────────────
+    # Asked to "rewrite naturally", the model deleted a boundary-proximity warning and
+    # returned neutral distances — and in an earlier run volunteered "Continue your
+    # current course" 2.3 km from the Sri Lanka IMBL. A warning that a language model can
+    # edit is not a warning. The text is fixed here; the model may only translate it.
+    alerts = state.get("alerts") or []
+    if any(
+        alert in (AlertType.GEOFENCE_BREACH, AlertType.GEOFENCE_PROXIMITY)
+        for alert in alerts
+    ):
+        warning = (state.get("geofence") or {}).get("summary")
+        if warning:
+            if language_code == "en":
+                return warning
+            return await translate_only(warning, language_code)
+
+    # ── The productivity narrative is deterministic too ───────────────────
+    # It states a measured change and explicitly declines to claim causation. Handing it
+    # back for a "natural rewrite" is how the model reintroduced "both low, indicating
+    # reduced primary productivity" over a chlorophyll value that was in fact high.
+    narrative = (state.get("marine") or {}).get("narrative")
+    if intent is Intent.DIAGNOSTIC and narrative:
+        return await translate_only(narrative, language_code)
 
     # ── Safety answers are phrased by the risk agent ──────────────────────
     # It holds the verdict-communication rules (never soften, never re-decide), so the
@@ -145,6 +297,13 @@ async def write_answer(state: OrcaState) -> str:
     if not llm.available():
         return deterministic
 
+    # An answer whose whole content is "I could not do this" must not be handed to a
+    # model along with a pile of evidence — it reaches for the data and produces
+    # something that reads like the analysis we just said we could not do. Translate it,
+    # never rewrite it.
+    if _is_unavailability_answer(deterministic):
+        return await translate_only(deterministic, language_code)
+
     try:
         prompt = (
             f"The user asked: {state.get('query', '')}\n\n"
@@ -161,6 +320,22 @@ async def write_answer(state: OrcaState) -> str:
         logger.warning("explainability: LLM answer failed (%s) — using the rule-based text", exc)
 
     return deterministic
+
+
+# Openings used by every "we could not do this" answer below. Kept as a list so the
+# check stays in step with the phrasings rather than guessing at them.
+_UNAVAILABLE_MARKERS = (
+    "i could not",
+    "i cannot yet",
+    "no potential fishing zone was found",
+    "no restricted boundary was found",
+)
+
+
+def _is_unavailability_answer(text: str) -> bool:
+    """True when the answer's content is an honest gap rather than a finding."""
+    lowered = text.casefold()
+    return any(marker in lowered for marker in _UNAVAILABLE_MARKERS)
 
 
 def _deterministic_answer(state: OrcaState, intent: Intent) -> str:
@@ -206,13 +381,28 @@ def _deterministic_answer(state: OrcaState, intent: Intent) -> str:
         return f"No restricted boundary was found near {place}."
 
     if intent is Intent.DIAGNOSTIC:
+        # The narrative is built deterministically from the measured trend in
+        # agents/marine_data.describe_trend. It must NOT be re-derived from raw evidence
+        # here: asked to phrase this query from evidence alone, a model described
+        # chlorophyll of 2.447 mg/m³ — nearly 10× the productive threshold — as "low,
+        # indicating reduced primary productivity". Confidently wrong science is worse
+        # than an honest gap.
+        narrative = (state.get("marine") or {}).get("narrative")
+        if narrative:
+            return narrative
         if gaps:
-            return (
-                f"I cannot yet explain productivity changes near {place}. {gaps[0]}"
-            )
-        return f"Productivity analysis for {place} is not available yet."
+            return f"I cannot yet explain productivity changes near {place}. {gaps[0]}"
+        return f"I could not measure a productivity trend near {place}."
 
     if intent is Intent.GENERAL:
+        # Retrieval answers marine background questions ("what is a PFZ?", "what does
+        # crossing the IMBL mean?") that fall outside the golden path but are squarely
+        # within what a fisherman might ask. Retrieved text explains concepts; it never
+        # supplies a number, because a retrieved value has no timestamp and no source.
+        retrieved = retrieve_background(state.get("query", ""))
+        if retrieved:
+            return retrieved
+
         return (
             "I can help with four things: finding the nearest potential fishing zone, "
             "checking whether it is safe to go to sea, warning you about restricted "
@@ -253,5 +443,5 @@ def assemble_response(state: OrcaState) -> OrcaResponse:
         alerts=state.get("alerts") or [],
         charts=state.get("charts") or [],
         used_mock_data=bool(state.get("used_mock_data")),
-        attribution=collect_attribution(state),
+        attribution=collect_attribution(state) + translation_attribution(),
     )

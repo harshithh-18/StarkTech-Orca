@@ -225,12 +225,50 @@ where parseable, plus Open-Meteo's `thunderstorm_probability` as a proxy.
 
 ## Marine Regions — EEZ and IMBL
 
-Download the EEZ v11/v12 GeoJSON from `marineregions.org`, filter to India, store in
-`data/geojson/`. Loaded once at startup into shapely geometries by `geojson_store.py`.
+**No manual download needed.** Marine Regions runs a public GeoServer WFS, and
+`scripts/download_geojson.py` pulls both layers straight from it:
+
+```
+https://geo.vliz.be/geoserver/MarineRegions/wfs
+  MarineRegions:eez              CQL: sovereign1='India'
+  MarineRegions:eez_boundaries   CQL: sovereign1='India' OR sovereign2='India'
+```
+
+Field names are **lowercase** (`sovereign1`, not `SOVEREIGN1`) — check with
+`DescribeFeatureType` if a filter returns "Illegal property name".
+
+India's EEZ is **two MultiPolygons** — mainland (1,659,500 km²) and Andaman & Nicobar
+(664,448 km²). Keeping only the largest would put every island query outside Indian waters.
+
+### Not every boundary line is an IMBL
+
+The WFS returns **32** line features for India. Only **17** go into `india_imbl.geojson`:
+
+| `line_type` | Keep? | Why |
+|---|---|---|
+| Treaty, Median line, Court ruling | ✅ | Agreed boundaries with a neighbouring state — the lines that get boats detained |
+| 200 NM | ❌ | Outer EEZ edge facing the high seas; leaving it is lawful, and `inside_eez` covers it |
+| **Straight baseline** | ❌ | The coastal reference line the territorial sea is measured *from*. It hugs the shore, so including it would place a "boundary" a few km from every harbour and fire a proximity alert on essentially every query |
+| Connection line | ❌ | Cartographic joins, not boundaries |
 
 Powers golden query #3: point-in-polygon plus **distance to the International Maritime
 Boundary Line**, which is the alert fishermen actually need — crossing the IMBL is what gets
 boats detained.
+
+### What counts as a breach — two bugs worth not repeating
+
+Found against real data on 2 Sep 2026:
+
+1. **`inside_eez == False` is NOT a breach.** It fired at Kakinada (the EEZ polygon covers
+   water, so a quayside point is outside it) and in lawful international waters. Only
+   *inside an MPA* or *across an IMBL* is a breach. An alert that cries wolf at the
+   harbour wall trains the user to ignore the one that matters.
+2. **The proximity warning is deterministic and the LLM may only translate it.** Asked to
+   "rewrite naturally" a result 2.3 km from the Sri Lanka boundary, the model deleted the
+   warning entirely — and in an earlier run added *"Continue your current course"*, advice
+   nobody computed, in exactly the situation where boats get detained. Same principle as
+   the safety verdict: the model phrases, it never decides. Guarded by
+   `tests/test_geofence.py`.
 
 ## Protected Planet (WDPA)
 

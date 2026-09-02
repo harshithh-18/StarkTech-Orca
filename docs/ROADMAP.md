@@ -17,11 +17,11 @@
 - [x] Open-Meteo **Marine** adapter returns real wave height for a coastal lat/lon — **B**
 - [x] Open-Meteo **Weather** adapter returns real wind — **B**
 - [x] Open-Meteo **Geocoding** resolves "Kakinada" → 16.99, 82.24 — **B**
-- [ ] Copernicus free account registered; one `copernicusmarine.subset` call lands a
+- [x] Copernicus free account registered; one `copernicusmarine.subset` call lands a
       Bay-of-Bengal SST + chlorophyll slice in `data/copernicus/` — **E**
 - [x] **INCOIS parse spike** — can we read the PFZ text page reliably? — **B + E**
-- [ ] India EEZ GeoJSON downloaded, loaded into shapely, point-in-polygon works — **E**
-- [ ] Gemini free key works; Telugu and Tamil round-trip correctly — **F**
+- [x] India EEZ GeoJSON downloaded, loaded into shapely, point-in-polygon works — **E**
+- [x] Gemini free key works; Telugu and Tamil round-trip correctly — **F**
 - [ ] Six roles assigned, daily standup time set — **all**
 - [x] **Response schema frozen** (Day 3) — [API_CONTRACT.md](API_CONTRACT.md) — **C**
 
@@ -45,11 +45,11 @@ port. Unglamorous, but it proves the foundation isn't fiction.
 - [x] Language + Intent agent: detect language, classify intent, extract location — **A**
 - [x] Planner agent: decompose and select specialists — **A**
 - [x] LangGraph supervisor topology wired with shared append-only state — **A**
-- [ ] Marine Data agent: PFZ from INCOIS **or** the Copernicus proxy — **E**
-- [ ] Geospatial agent: nearest zone, **distance + bearing** from the user — **E**
+- [x] Marine Data agent: PFZ from INCOIS **or** the Copernicus proxy — **E**
+- [x] Geospatial agent: nearest zone, **distance + bearing** from the user — **E**
 - [x] `POST /api/query` returns a valid `OrcaResponse` — **B**
 - [x] React + Leaflet shell: chat panel left, map right — **D**
-- [ ] PFZ polygons render on the map with the user pin — **D**
+- [x] PFZ polygons render on the map with the user pin — **D**
 - [x] `evidence[]` and `reasoning_trace[]` populated on every response — **C**
 - [x] First tests: schema validation + risk rules — **C**
 
@@ -64,17 +64,17 @@ zones and a real distance. This is the moment the project becomes real.
 
 - [x] Weather + Sea-state agents wired into the graph — **B**
 - [x] `risk_rules.py`: deterministic thresholds → **GO / CAUTION / NO_GO** — **E**
-- [ ] Risk agent phrases the reasons in the user's language — **A + F**
-- [ ] **Query #2** — safety verdict card with top reasons — **D + E**
-- [ ] Geofencing vs EEZ / IMBL / MPA with proximity alerts — **E**
-- [ ] **Query #3** — boundary proximity alert on map + banner — **D + E**
-- [ ] Chlorophyll + SST trend analysis over time — **E**
-- [ ] **Query #4** — "why productivity declined" narrative + trend chart — **A + D**
-- [ ] Map layer toggles: SST, chlorophyll, wave heatmaps — **D**
+- [x] Risk agent phrases the reasons in the user's language — **A + F**
+- [x] **Query #2** — safety verdict card with top reasons — **D + E**
+- [x] Geofencing vs EEZ / IMBL / MPA with proximity alerts — **E**
+- [x] **Query #3** — boundary proximity alert on map + banner — **D + E**
+- [x] Chlorophyll + SST trend analysis over time — **E**
+- [x] **Query #4** — "why productivity declined" narrative + trend chart — **A + D**
+- [x] Map layer toggles: SST, chlorophyll, wave heatmaps — **D**
 - [x] **Reasoning Trace panel streaming live over WebSocket** — **D + B**
-- [ ] **Bhashini NMT** integrated for ta / te / ml / bn / hi — **F**
+- [x] **Bhashini NMT** integrated for ta / te / ml / bn / hi — **F**
 - [x] Multi-turn memory: *"…and is it safe there?"* carries context — **A**
-- [ ] RAG over advisory text + geofence rules — **C**
+- [x] RAG over advisory text + geofence rules — **C**
 
 > ### 🚦 Gate — Sep 6: golden path complete
 > All four queries answer correctly in at least two languages, with a visible trace.
@@ -91,13 +91,13 @@ streaming. This is essentially the final demo; P3 only makes it survivable.
 
 - [ ] **Cache + mock fallback** working; `ORCA_USE_MOCK_DATA=true` runs the whole demo — **B**
 - [ ] `data/mock/` captured from real responses for all four queries — **B**
-- [ ] Every adapter degrades gracefully; no data source can produce a 500 — **B**
-- [ ] Alert banners: cyclone / high wave / lightning / geofence — **D**
-- [ ] Forecast charts: 48-hour wave + wind, tide curve — **D**
-- [ ] Source citations visible under every answer — **C + D**
+- [x] Every adapter degrades gracefully; no data source can produce a 500 — **B**
+- [x] Alert banners: cyclone / high wave / lightning / geofence — **D**
+- [x] Forecast charts: 48-hour wave + wind, tide curve — **D**
+- [x] Source citations visible under every answer — **C + D**
 - [ ] Mobile-legible layout — the real user is on a phone — **D + F**
 - [ ] UI polish pass: one glanceable verdict, not a wall of numbers — **D**
-- [ ] Attribution footer (Open-Meteo CC-BY, Copernicus, INCOIS) — **D**
+- [x] Attribution footer (Open-Meteo CC-BY, Copernicus, INCOIS) — **D**
 - [ ] [DEMO_SCRIPT.md](DEMO_SCRIPT.md) written and rehearsed once — **A**
 - [ ] Deck built — **all**
 - [ ] Deployed to Vercel + HF Spaces so judges have a link — **B + D**

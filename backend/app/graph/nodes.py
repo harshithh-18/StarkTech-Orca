@@ -32,7 +32,7 @@ from app.agents import (
 )
 from app.agents.base import get_collector
 from app.graph.state import OrcaState
-from app.schemas.enums import Intent, TraceStatus
+from app.schemas.enums import AlertType, Intent, TraceStatus
 from app.services import explainability
 
 logger = logging.getLogger(__name__)
@@ -201,6 +201,11 @@ async def sea_state_node(state: OrcaState) -> dict:
 
 
 async def marine_data_node(state: OrcaState) -> dict:
+    # "Why has productivity declined?" asks about change over time, not where the fish
+    # are right now — a different computation over the same product.
+    if state.get("intent") is Intent.DIAGNOSTIC:
+        return await _productivity_trend(state)
+
     async def work() -> dict:
         result = await marine_data.get_fishing_zones(state["location"])
         nearest = await geospatial.nearest_zone(state["location"], result["geojson"])
@@ -224,6 +229,44 @@ async def marine_data_node(state: OrcaState) -> dict:
 
     return await _run_specialist(
         state, "marine_data", work, "Locating potential fishing zones…", source="Copernicus / INCOIS"
+    )
+
+
+async def _productivity_trend(state: OrcaState) -> dict:
+    """Golden query #4: chlorophyll and SST over time, plus the narrative."""
+
+    async def work() -> dict:
+        evidence, chart = await marine_data.get_productivity_trend(state["location"])
+        narrative = marine_data.describe_trend(evidence, state["location"])
+
+        change = next(
+            (e for e in evidence if e.field == "chlorophyll_change_pct"), None
+        )
+        summary = (
+            f"chlorophyll {float(change.value):+.0f}% vs the preceding period"
+            if change is not None
+            else f"{len(evidence)} trend values"
+        )
+
+        return {
+            "marine": {
+                "trend": True,
+                "evidence": evidence,
+                "charts": [chart],
+                "narrative": narrative,
+            },
+            "evidence": evidence,
+            "charts": [chart],
+            "attribution": [marine_data.copernicus.ATTRIBUTION],
+            "_message": f"Productivity trend: {summary}",
+        }
+
+    return await _run_specialist(
+        state,
+        "marine_data",
+        work,
+        "Analysing chlorophyll and SST over time…",
+        source="Copernicus Marine",
     )
 
 
@@ -253,12 +296,31 @@ async def geospatial_node(state: OrcaState) -> dict:
                 parts.append(f"{state_word} {label}, boundary {distance.value} km away")
 
         summary = "; ".join(parts) if parts else "no boundary data available"
+        answer = f"You are {summary}." if parts else summary
+
+        # Lead with the warning rather than leaving the tone to a language model. The
+        # proximity case is the whole point of this agent — crossing the IMBL is what
+        # gets boats detained, and a warning buried after three distances is no warning.
+        if AlertType.GEOFENCE_BREACH in alerts:
+            answer = (
+                "WARNING — you are inside a restricted maritime zone. Leave the area. "
+                + answer
+            )
+        elif AlertType.GEOFENCE_PROXIMITY in alerts:
+            imbl = by_field.get("distance_to_imbl")
+            distance_text = f"{imbl.value} km" if imbl else "very close"
+            answer = (
+                f"WARNING — you are only {distance_text} from an international maritime "
+                f"boundary. Crossing it without authorisation can result in detention by "
+                f"the neighbouring coast guard. Turn back toward Indian waters. " + answer
+            )
+
         return {
             "geofence": {
                 "evidence": evidence,
                 "checked": True,
                 "near_mpa": any(a.value.startswith("GEOFENCE") for a in alerts),
-                "summary": f"You are {summary}." if parts else summary,
+                "summary": answer,
             },
             "evidence": evidence,
             "alerts": alerts,

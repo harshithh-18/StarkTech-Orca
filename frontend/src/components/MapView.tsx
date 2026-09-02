@@ -47,8 +47,80 @@ const LAYER_STYLE: Partial<Record<MapLayer, L.PathOptions>> = {
   pfz_zones: { color: "#15803d", weight: 2, fillOpacity: 0.35 },
 };
 
-/** Layers served as GeoJSON from the backend. The rest are client-side or not built yet. */
+/** Layers served as GeoJSON polygons/lines from the backend. */
 const GEOJSON_LAYERS: MapLayer[] = ["pfz_zones", "eez_boundary", "imbl_line", "mpa_zones"];
+
+/** Gridded point layers, rendered as a coloured scatter rather than vector outlines. */
+const HEATMAP_LAYERS: MapLayer[] = ["chlorophyll_heatmap", "sst_heatmap"];
+
+/** Colour ramps, low → high. Green for productivity, warm for temperature. */
+const RAMPS: Record<string, string[]> = {
+  chlorophyll_heatmap: ["#f7fcf5", "#c7e9c0", "#74c476", "#31a354", "#006d2c"],
+  sst_heatmap: ["#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"],
+};
+
+function rampColor(layer: MapLayer, value: number, min: number, max: number): string {
+  const ramp = RAMPS[layer] ?? RAMPS.chlorophyll_heatmap;
+  if (!Number.isFinite(value) || max <= min) return ramp[0];
+  const t = Math.min(1, Math.max(0, (value - min) / (max - min)));
+  return ramp[Math.min(ramp.length - 1, Math.floor(t * ramp.length))];
+}
+
+/** A gridded field drawn as small coloured dots. */
+function HeatmapData({ layer, center }: { layer: MapLayer; center: Location | null }) {
+  const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null);
+
+  useEffect(() => {
+    if (!center) return;
+    let cancelled = false;
+
+    getLayerCached(layer, { lat: center.lat, lon: center.lon })
+      .then((collection) => {
+        if (!cancelled) setData(collection);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [layer, center?.lat, center?.lon]);
+
+  if (!data?.features?.length) return null;
+
+  // min/max ride along on the collection so the ramp doesn't need a second pass.
+  const props = (data as unknown as { properties?: Record<string, number | string> })
+    .properties;
+  const min = Number(props?.min ?? 0);
+  const max = Number(props?.max ?? 1);
+  const unit = String(props?.unit ?? "");
+
+  return (
+    <>
+      {data.features.map((feature, index) => {
+        const coords = (feature.geometry as GeoJSON.Point)?.coordinates;
+        const value = Number(feature.properties?.value);
+        if (!coords || !Number.isFinite(value)) return null;
+        return (
+          <CircleMarker
+            key={`${layer}-${index}`}
+            center={[coords[1], coords[0]]}
+            radius={5}
+            pathOptions={{
+              color: rampColor(layer, value, min, max),
+              fillColor: rampColor(layer, value, min, max),
+              fillOpacity: 0.55,
+              weight: 0,
+            }}
+          >
+            <Popup>
+              {value} {unit}
+            </Popup>
+          </CircleMarker>
+        );
+      })}
+    </>
+  );
+}
 
 /** Pans (never jumps) to a new answer's location. */
 function Recenter({ center }: { center: Location | null }) {
@@ -135,6 +207,13 @@ export default function MapView({ center, activeLayers, userLocation }: Props) {
       />
 
       <Recenter center={center} />
+
+      {/* Heatmaps first so vector zones and boundaries draw on top of them. */}
+      {activeLayers
+        .filter((layer) => HEATMAP_LAYERS.includes(layer))
+        .map((layer) => (
+          <HeatmapData key={layer} layer={layer} center={center} />
+        ))}
 
       {activeLayers
         .filter((layer) => GEOJSON_LAYERS.includes(layer))

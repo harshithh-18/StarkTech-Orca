@@ -118,9 +118,59 @@ async def get_layer(
     if layer is MapLayer.USER_PIN:
         return EMPTY
 
-    # ── Heatmaps ──────────────────────────────────────────────────────────
-    # TODO(P2, E): serve sst/chlorophyll/wave heatmaps as a coarse grid via
-    #              adapters.copernicus.get_grid — downsampled hard, a full Copernicus
-    #              grid is far too heavy for Leaflet on a phone.
+    # ── Gridded heatmaps ──────────────────────────────────────────────────
+    if layer in (MapLayer.CHLOROPHYLL_HEATMAP, MapLayer.SST_HEATMAP):
+        if lat is None or lon is None:
+            raise HTTPException(
+                status_code=422,
+                detail=ErrorResponse(
+                    error=ErrorDetail(
+                        code="LOCATION_UNRESOLVED",
+                        message=f"{layer.value} needs lat and lon.",
+                        hint=f"Call /api/layers/{layer.value}?lat=16.99&lon=82.24",
+                    )
+                ).model_dump(),
+            )
+
+        from app.adapters import copernicus
+
+        field = "chl" if layer is MapLayer.CHLOROPHYLL_HEATMAP else "sst"
+        box = _bbox_around(lat, lon, radius_km)
+        bbox = (
+            {"lon_min": box[0], "lat_min": box[1], "lon_max": box[2], "lat_max": box[3]}
+            if box
+            else None
+        )
+        try:
+            return await copernicus.get_grid(field, bbox)
+        except copernicus.CopernicusDataMissing as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=ErrorResponse(
+                    error=ErrorDetail(
+                        code="ADAPTER_UNAVAILABLE",
+                        message=str(exc),
+                        hint="Run `python scripts/fetch_copernicus_subset.py`.",
+                    )
+                ).model_dump(),
+            ) from exc
+        except Exception as exc:
+            # The degradation rule is absolute: a map layer failing must not 500. It
+            # costs the user one overlay, not the whole answer.
+            logger.exception("layers: %s grid failed", layer.value)
+            raise HTTPException(
+                status_code=503,
+                detail=ErrorResponse(
+                    error=ErrorDetail(
+                        code="ADAPTER_UNAVAILABLE",
+                        message=f"Could not build the {layer.value} grid: {exc}",
+                        hint="The other layers are unaffected; check the server logs.",
+                    )
+                ).model_dump(),
+            ) from exc
+
+    # ── Not built ─────────────────────────────────────────────────────────
+    # TODO(P3, B): wave_heatmap needs a gridded Open-Meteo sweep; route_line and
+    #              hazard_overlay are drawn client-side from the response.
     logger.info("layers: %s is not implemented yet — returning an empty collection", layer.value)
     return EMPTY

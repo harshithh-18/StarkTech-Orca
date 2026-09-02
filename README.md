@@ -132,7 +132,10 @@ until it lands the responsible agent emits a visible `skipped` step naming the f
 > A dead model is not fatal — ORCA falls back to the deterministic path and answers
 > correctly in English. Check `/ready` and the trace's `[via …]` tag to tell which ran.
 | **Copernicus account** (free) | Golden query #1 — the computed PFZ proxy | [register](https://data.marine.copernicus.eu/register), then `copernicusmarine login` and `python scripts/fetch_copernicus_subset.py` |
-| **EEZ / IMBL / MPA polygons** | Golden query #3 — geofencing | `python scripts/download_geojson.py` prints the two download links and converts what you drop in |
+| **EEZ / IMBL polygons** | Golden query #3 — geofencing | `python scripts/download_geojson.py` — fetches both automatically from Marine Regions' public WFS, no form needed |
+| **MPA polygons** (optional) | Protected-area breach alerts | [Protected Planet](https://www.protectedplanet.net/country/IND) → accept terms → drop the zip in `data/geojson/raw/` and re-run the script |
+| **Knowledge base** (optional) | Answers to general marine questions | `python -m app.rag.ingest` — first run downloads a small embedding model |
+| **Bhashini** (optional) | Government of India NMT, preferred over the LLM for Indic output | [bhashini.gov.in/ulca](https://bhashini.gov.in/ulca) → `BHASHINI_USER_ID` + `BHASHINI_API_KEY` |
 
 ## Documentation
 

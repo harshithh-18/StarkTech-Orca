@@ -240,18 +240,25 @@ def _geodesic_to_geometry(location: Location, geometry) -> tuple[float | None, f
 def derive_geofence_alerts(evidence: list[Evidence], buffer_km: float = 10.0) -> list[AlertType]:
     """GEOFENCE_BREACH when inside a restricted zone, GEOFENCE_PROXIMITY when near one.
 
-    The EEZ is *ours* — being inside it is the normal, legal state, so it never raises a
-    breach. The IMBL and protected areas are the ones with consequences.
+    ## What is and is not a breach
+
+    Only two things raise a breach: being **inside a Marine Protected Area**, and being
+    **across an IMBL**. Everything else is lawful.
+
+    In particular, ``inside_eez == False`` is NOT a breach, and treating it as one was a
+    real bug — it fired at Kakinada, a home harbour, because the EEZ polygon covers water
+    and a quayside point sits just outside it. It would also fire in international waters,
+    where any vessel may lawfully be. An alert that cries wolf at the harbour wall trains
+    the user to ignore the one that matters.
+
+    The IMBL is the line with consequences: crossing it is what gets boats detained, so
+    the alert has to arrive on *approach*, not after the fact.
     """
     alerts: list[AlertType] = []
     by_field = {e.field: e for e in evidence}
 
-    if bool(by_field.get("inside_mpa", None) and by_field["inside_mpa"].value):
-        alerts.append(AlertType.GEOFENCE_BREACH)
-
-    # Outside our own EEZ means across a maritime boundary — that is a breach.
-    inside_eez = by_field.get("inside_eez")
-    if inside_eez is not None and inside_eez.value is False:
+    inside_mpa = by_field.get("inside_mpa")
+    if inside_mpa is not None and bool(inside_mpa.value):
         alerts.append(AlertType.GEOFENCE_BREACH)
 
     for key in ("imbl", "mpa"):

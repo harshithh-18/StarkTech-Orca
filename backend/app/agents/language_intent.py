@@ -54,6 +54,20 @@ _SCRIPT_RANGES: list[tuple[int, int, Language]] = [
 # Words that are distinctively Marathi rather than Hindi, both being Devanagari.
 _MARATHI_MARKERS = ("आहे", "नाही", "समुद्रात", "मासे", "उद्या")
 
+# Phrasings that mark a question about a concept rather than a request to act. Anchored
+# at the start, or clearly self-referential ("does ORCA…"), so that a genuine request that
+# happens to contain "what" — "what is the wave height at Kakinada" — is not swept up.
+_DEFINITIONAL_PATTERN = (
+    r"^what (is|are|does|do)\b(?!.*\b(at|near|off|around)\b)"
+    r"|^what happens (if|when)\b"
+    r"|^what can (you|orca)\b"
+    r"|^(how|why) (does|do|is|are) (you|orca|this|the system)\b"
+    r"|^(explain|define|tell me about)\b"
+    r"|\b(meaning|definition) of\b"
+    r"|\bwhat does .* mean\b"
+    r"|^(can|does) orca\b"
+)
+
 # Intent keywords, in English and romanised/native forms a coastal user might type.
 # Ordered by specificity: the first intent with a match wins, so narrow intents come
 # before broad ones.
@@ -83,7 +97,18 @@ _INTENT_KEYWORDS: list[tuple[Intent, tuple[str, ...]]] = [
     ),
     (
         Intent.ROUTE_PLANNING,
-        ("route", "path", "shortest way", "how do i get to", "sail to", "navigate to"),
+        # Trailing \b on the phrases ending in a preposition. Without it "sail to"
+        # matches inside "sail TOmorrow", so "is it safe to sail tomorrow?" — golden
+        # query #2 — was classified as route planning. Substring matching on short
+        # function words is exactly where this goes wrong.
+        (
+            r"\broute\b",
+            r"\bshortest way\b",
+            r"how do i get to\b",
+            r"\bsail to\b",
+            r"\bnavigate to\b",
+            r"\bfrom .+ to .+\b",
+        ),
     ),
     (
         Intent.SAFETY_CHECK,
@@ -122,10 +147,27 @@ _REFERENTIAL = (
 )
 
 # Words that look like place names but aren't, so we don't geocode "Sea" or "Tomorrow".
+#
+# The capitalised-token heuristic below is otherwise fooled by the FIRST word of any
+# sentence: "What is a Potential Fishing Zone?" yielded "What", and the geocoder will
+# happily return a real coordinate for a surprising number of such words. Question words
+# and domain nouns are therefore listed explicitly.
 _NOT_A_PLACE = {
-    "sea", "ocean", "coast", "shore", "harbour", "harbor", "port", "today",
-    "tomorrow", "tonight", "morning", "evening", "night", "safe", "fishing",
-    "zone", "the", "is", "it", "to", "go", "near", "am", "i", "my", "we",
+    # Geography words that are not a specific place
+    "sea", "ocean", "coast", "shore", "harbour", "harbor", "port", "bay", "gulf",
+    "water", "waters", "region", "area", "areas", "zone", "zones", "boundary",
+    # Time
+    "today", "tomorrow", "tonight", "morning", "evening", "night", "week", "day",
+    # Question and command words — almost always the capitalised first token
+    "what", "where", "when", "why", "how", "which", "who", "whose", "explain",
+    "define", "tell", "show", "find", "give", "plan", "check", "please",
+    # Domain nouns that appear capitalised in a question
+    "potential", "fishing", "marine", "protected", "chlorophyll", "temperature",
+    "wave", "waves", "wind", "storm", "cyclone", "lightning", "tide", "current",
+    "safe", "safety", "danger", "route", "orca", "imbl", "eez", "mpa", "pfz",
+    # Function words
+    "the", "is", "are", "it", "to", "go", "near", "am", "i", "my", "we", "can",
+    "does", "do", "should", "could", "there", "here", "this", "that", "any",
 }
 
 
@@ -153,9 +195,35 @@ async def detect_language(text: str) -> Language:
     return detect_language_sync(text)
 
 
+def is_definitional(query: str) -> bool:
+    """Is this a question ABOUT a concept, rather than a request to act on one?
+
+    "What is a Potential Fishing Zone?" contains every PFZ keyword but wants an
+    explanation, not a lookup — and routing it to the marine agent produced a
+    LOCATION_UNRESOLVED error for a question that never needed a location.
+
+    Deliberately narrow. "Why has productivity declined here?" also starts with a
+    question word but is a genuine diagnostic request, so bare "why" is not a trigger.
+
+    Naming a place settles it: a question about a concept has no location, while "what is
+    the best route from Kakinada to Chennai" names two and clearly wants an answer about
+    the world rather than a definition.
+    """
+    lowered = query.casefold().strip()
+    if not re.search(_DEFINITIONAL_PATTERN, lowered):
+        return False
+    return extract_place_name(query) is None
+
+
 def classify_intent_sync(query: str) -> Intent:
     """Keyword-based intent classification. No I/O, always available."""
     lowered = query.casefold()
+
+    # Checked before the topic keywords: a definitional question mentions the topic by
+    # necessity, so topic matching alone always misroutes it.
+    if is_definitional(query):
+        return Intent.GENERAL
+
     for intent, keywords in _INTENT_KEYWORDS:
         for keyword in keywords:
             # A few entries are regexes ("where.*fish"); plain substrings work under
@@ -352,7 +420,35 @@ async def detect_and_classify(
                 language.value,
             )
         try:
-            intent = Intent(enriched.get("intent", intent.value))
+            proposed = Intent(enriched.get("intent", intent.value))
+
+            # A definitional question is answered from the knowledge base, never by a
+            # specialist — it has no location by nature, so routing it to one produces
+            # LOCATION_UNRESOLVED for a question that never needed a place. The model
+            # reliably "upgrades" these to a topic intent, so the rules win outright.
+            if is_definitional(state_query := query):
+                logger.info(
+                    "language_intent: %r is definitional — keeping GENERAL over the "
+                    "LLM's %s",
+                    state_query[:60],
+                    proposed.value,
+                )
+                proposed = Intent.GENERAL
+
+            # Never let the model DOWNGRADE a specific match to the catch-all bucket.
+            # The rules only return a golden-path intent when a distinctive keyword is
+            # present, so a rule match is strong evidence; GENERAL is merely the fallback.
+            # Observed: "Why has fish productivity declined?" matched DIAGNOSTIC on
+            # 'why'/'productivity'/'declined' and the model still answered GENERAL, which
+            # routed the query away from its specialist and into free-form prose.
+            if proposed is Intent.GENERAL and intent is not Intent.GENERAL:
+                logger.info(
+                    "language_intent: LLM proposed GENERAL but rules matched %s — "
+                    "keeping the specific intent",
+                    intent.value,
+                )
+            else:
+                intent = proposed
         except ValueError:
             logger.info(
                 "language_intent: LLM returned unknown intent %r, keeping %s",

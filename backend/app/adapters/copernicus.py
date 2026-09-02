@@ -22,6 +22,7 @@ visible `skipped` trace step.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import get_settings
@@ -254,6 +255,62 @@ def load_grids(bbox: dict | None = None) -> tuple[Grid, Grid]:
     )
 
 
+def load_series(field: str, bbox: dict, area_mean: bool = True):
+    """Time series of a field over an area. Returns (times, values).
+
+    Averaged over the box rather than sampled at one pixel: a single cell is noisy and
+    frequently NaN under cloud, and a "trend" built from one flickering pixel would be
+    an artefact of the sensor rather than a fact about the ocean.
+
+    ``values`` may contain NaN for dates where the whole box was cloud-covered — the
+    caller must treat those as missing, not as zero productivity.
+    """
+    import numpy as np
+
+    if field.startswith("chl"):
+        dataset = open_chlorophyll()
+        variable = _pick_variable(dataset, CHLOROPHYLL_VARIABLES, "chlorophyll")
+    else:
+        dataset = open_sst()
+        variable = _pick_variable(dataset, SST_VARIABLES, "SST")
+
+    lat_name, lon_name = _coord_names(dataset)
+    array = dataset[variable].sel(
+        {
+            lat_name: slice(bbox["lat_min"], bbox["lat_max"]),
+            lon_name: slice(bbox["lon_min"], bbox["lon_max"]),
+        }
+    )
+
+    if "depth" in array.dims:
+        array = array.isel(depth=0)  # surface only
+
+    if "time" not in array.dims:
+        raise CopernicusDataMissing(
+            f"the {field} subset has no time dimension — re-download with "
+            f"`python scripts/fetch_copernicus_subset.py --days-back 120`"
+        )
+
+    times = [
+        datetime.fromisoformat(str(t)[:19]).replace(tzinfo=timezone.utc)
+        for t in array["time"].values
+    ]
+
+    if area_mean:
+        # nanmean so partial cloud cover still yields a usable daily value.
+        spatial_dims = [d for d in array.dims if d != "time"]
+        values = np.asarray(
+            array.mean(dim=spatial_dims, skipna=True).values, dtype=float
+        )
+    else:
+        values = np.asarray(array.values, dtype=float)
+
+    if not field.startswith("chl") and np.nanmedian(values) > 200:
+        values = values - 273.15  # kelvin → °C
+
+    return times, values
+
+
 async def get_grid(field: str, bbox: dict | None = None, downsample: int = 4) -> dict:
     """A coarse grid for the frontend heatmap layers.
 
@@ -262,27 +319,48 @@ async def get_grid(field: str, bbox: dict | None = None, downsample: int = 4) ->
     """
     import numpy as np
 
-    chl, sst, lats, lons = load_grids(bbox)
-    values = chl if field.startswith("chl") else sst
+    chl_grid, sst_grid = load_grids(bbox)
+    grid = chl_grid if field.startswith("chl") else sst_grid
 
-    values = values[::downsample, ::downsample]
-    lats = lats[::downsample]
-    lons = lons[::downsample]
+    # SST ships at 0.05° and chlorophyll at 0.25°, so a fixed stride would downsample
+    # them by wildly different amounts. Target a cell count instead, so both layers land
+    # at a density Leaflet can draw on a phone.
+    target_cells = 60
+    step_y = max(1, grid.values.shape[0] // target_cells)
+    step_x = max(1, grid.values.shape[1] // target_cells)
 
-    points = []
+    values = grid.values[::step_y, ::step_x]
+    lats = grid.lats[::step_y]
+    lons = grid.lons[::step_x]
+
+    features = []
     for i, lat in enumerate(lats):
         for j, lon in enumerate(lons):
             value = values[i, j]
             if np.isnan(value):
-                continue
-            points.append(
-                {"lat": round(float(lat), 3), "lon": round(float(lon), 3),
-                 "value": round(float(value), 3)}
+                continue  # land or cloud — a gap, not a zero
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Point",
+                        "coordinates": [round(float(lon), 3), round(float(lat), 3)],
+                    },
+                    "properties": {"value": round(float(value), 3), "field": field},
+                }
             )
 
+    finite = values[~np.isnan(values)]
+    # A GeoJSON FeatureCollection so every layer the API serves speaks one format.
+    # min/max ride along so the client can colour the scale without a second pass.
     return {
-        "field": field,
-        "unit": "mg/m³" if field.startswith("chl") else "°C",
-        "source": ATTRIBUTION,
-        "points": points,
+        "type": "FeatureCollection",
+        "features": features,
+        "properties": {
+            "field": field,
+            "unit": "mg/m³" if field.startswith("chl") else "°C",
+            "source": ATTRIBUTION,
+            "min": round(float(finite.min()), 3) if finite.size else None,
+            "max": round(float(finite.max()), 3) if finite.size else None,
+        },
     }

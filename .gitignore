@@ -45,3 +45,6 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/settings.json.example
+
+# RAG vector store — regenerate with `python -m app.rag.ingest`
+data/chroma/

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 
+from app.i18n import bhashini
 from app.schemas.enums import AlertType, Verdict
 from app.schemas.response import Evidence
 from app.services import llm, risk_rules
@@ -115,7 +116,24 @@ async def phrase_reasons(
     """
     fallback = phrase_reasons_deterministic(verdict, reasons)
 
-    if language == "en" or not llm.available() or not reasons:
+    if language == "en" or not reasons:
+        return fallback
+
+    # Bhashini first when it is configured: translating the deterministic sentence is
+    # strictly safer than letting a model compose one, because the verdict wording cannot
+    # drift at all — and it puts the Government of India's own Indic stack on the safety
+    # path, which is the point of using it.
+    if bhashini.available() and bhashini.supports("en", language):
+        try:
+            translated = await bhashini.translate(fallback, "en", language)
+            from app.services.explainability import _record_translator
+
+            _record_translator("bhashini")
+            return translated
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("risk: Bhashini translation failed (%s) — trying the LLM", exc)
+
+    if not llm.available():
         return fallback
 
     verdict_words = {

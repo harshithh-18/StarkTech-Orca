@@ -64,20 +64,45 @@ def select_layers(intent: Intent, state: dict) -> list[MapLayer]:
     return layers
 
 
+# Which chart belongs under which answer. The planner is allowed to over-dispatch — it
+# may call sea_state for a productivity question — but a 48-hour wave chart under "why
+# has productivity declined?" is a non-sequitur on screen, so relevance is enforced here
+# rather than depending on the plan being minimal.
+INTENT_CHARTS: dict[Intent, set[str]] = {
+    Intent.SAFETY_CHECK: {"wave_48h", "wind_48h", "tide"},
+    Intent.DIAGNOSTIC: {"chlorophyll_trend", "sst_trend"},
+    Intent.PFZ_LOOKUP: {"chlorophyll_trend"},
+    Intent.ROUTE_PLANNING: {"wave_48h", "wind_48h"},
+    Intent.GEOFENCE_CHECK: set(),
+    Intent.GENERAL: set(),
+}
+
+
 def build_charts(state: dict) -> list[ChartSpec]:
     """Assemble the chart specs relevant to this answer.
 
     Charts are built by the specialists that own the data (sea_state builds the wave
-    series); this collects whatever they produced and drops empty ones.
+    series); this collects whatever they produced, drops empty ones, and keeps only those
+    that answer the question actually asked.
     """
-    charts: list[ChartSpec] = []
+    intent = state.get("intent", Intent.GENERAL)
+    allowed = INTENT_CHARTS.get(intent, set())
 
+    charts: list[ChartSpec] = []
     for key in ("sea_state", "weather", "marine"):
         payload = state.get(key) or {}
         for chart in payload.get("charts", []):
-            if isinstance(chart, ChartSpec) and any(
-                point.y is not None for series in chart.series for point in series.points
-            ):
+            if not isinstance(chart, ChartSpec):
+                continue
+            if chart.id not in allowed:
+                logger.debug(
+                    "visualization: dropping chart %s — not relevant to %s",
+                    chart.id, intent.value,
+                )
+                continue
+            # A series that is entirely null renders as an empty frame; drop it rather
+            # than showing the user a chart with nothing in it.
+            if any(point.y is not None for series in chart.series for point in series.points):
                 charts.append(chart)
 
     return charts
