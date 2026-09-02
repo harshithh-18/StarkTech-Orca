@@ -17,6 +17,14 @@ interface Props {
   loading: boolean;
   onAsk: (query: string) => void;
   onRetry?: (id: string) => void;
+  onSpeak?: (message: ChatMessage) => void;
+  /** Voice input, when the browser supports it. */
+  voice?: {
+    supported: boolean;
+    listening: boolean;
+    listen: () => void;
+    stopListening: () => void;
+  };
 }
 
 /** The golden path, in the order the demo walks them. Labels keep the chips scannable. */
@@ -48,7 +56,7 @@ const SUGGESTIONS: { label: string; query: string; icon: string }[] = [
   },
 ];
 
-export default function ChatPanel({ messages, loading, onAsk, onRetry }: Props) {
+export default function ChatPanel({ messages, loading, onAsk, onRetry, onSpeak, voice }: Props) {
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -126,7 +134,12 @@ export default function ChatPanel({ messages, loading, onAsk, onRetry }: Props) 
         )}
 
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} onRetry={onRetry} />
+          <MessageBubble
+            key={message.id}
+            message={message}
+            onRetry={onRetry}
+            onSpeak={onSpeak}
+          />
         ))}
         <div ref={endRef} />
       </div>
@@ -157,6 +170,36 @@ export default function ChatPanel({ messages, loading, onAsk, onRetry }: Props) 
               className="w-full resize-none rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-sm transition-all placeholder:text-slate-400 focus:border-ocean-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-ocean-500/25 dark:border-white/10 dark:bg-abyss-950 dark:text-slate-100 dark:focus:bg-abyss-950"
             />
           </div>
+
+          {voice?.supported && (
+            <button
+              type="button"
+              onClick={() => (voice.listening ? voice.stopListening() : voice.listen())}
+              disabled={loading}
+              aria-label={voice.listening ? "Stop listening" : "Ask by voice"}
+              aria-pressed={voice.listening}
+              title={
+                voice.listening
+                  ? "Listening — click to stop"
+                  : "Ask by voice, in your own language"
+              }
+              className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-all hover:scale-105 active:scale-95 disabled:opacity-40 ${
+                voice.listening
+                  ? "border-rose-400 bg-rose-500 text-white"
+                  : "border-slate-300 bg-slate-100 text-ocean-700 hover:bg-slate-200 dark:border-white/10 dark:bg-white/5 dark:text-ocean-200 dark:hover:bg-white/10"
+              }`}
+            >
+              {voice.listening && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 animate-pulse-ring rounded-xl bg-rose-400"
+                />
+              )}
+              <span aria-hidden="true" className="relative text-base">
+                {voice.listening ? "⏹" : "🎙"}
+              </span>
+            </button>
+          )}
 
           <button
             type="button"

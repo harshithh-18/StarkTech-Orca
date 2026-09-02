@@ -87,12 +87,6 @@ def plan_deterministic(query: str, intent: Intent, has_location: bool) -> list[s
         # nothing to dispatch, and the caller turns that into LOCATION_UNRESOLVED.
         return []
 
-    # Route is a P3 stretch goal and is not built. Planning it would produce a node that
-    # can only fail — better to leave it out and say so than to fake the capability.
-    if "route" in chosen:
-        chosen.remove("route")
-        logger.info("planner: route_planning is not implemented yet — dropping it")
-
     return [name for name in SPECIALISTS if name in chosen]
 
 
@@ -131,7 +125,7 @@ async def plan(
         "- sea_state: wave height, swell, currents, sea surface temperature\n"
         "- marine_data: potential fishing zones, chlorophyll, productivity trends\n"
         "- geospatial: distance/bearing to zones, EEZ/IMBL/protected-area proximity\n"
-        "- route: least-risk sea path (NOT IMPLEMENTED — never choose this)\n"
+        "- route: least-risk sea path between two named places\n"
         "Choose the minimum set that fully answers the query. For a compound question, "
         "include every agent needed for every part of it."
     )
@@ -153,7 +147,7 @@ async def plan(
 
     valid, invalid = [], []
     for name in proposed:
-        if name in SPECIALISTS and name != "route":
+        if name in SPECIALISTS:
             if name not in valid:
                 valid.append(name)
         else:

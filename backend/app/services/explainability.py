@@ -314,6 +314,25 @@ async def write_answer(state: OrcaState) -> str:
     if intent is Intent.DIAGNOSTIC and narrative:
         return await translate_only(narrative, language_code)
 
+    # ── A route question is answered by the route ─────────────────────────
+    # The risk node also runs for this intent (a path can be unsafe), but the user asked
+    # "which way", so the path leads and the verdict is appended only when it was actually
+    # assessed. Without this the answer became "no forecast data available" — a verdict
+    # about evidence the route agent never produces.
+    route_summary = (state.get("route") or {}).get("summary")
+    if intent is Intent.ROUTE_PLANNING and route_summary:
+        answer = (
+            f"{route_summary} The path avoids the roughest water, costed at the time you "
+            f"would actually reach each stretch. Advisory only — it knows nothing about "
+            f"your vessel, shipping lanes or fuel."
+        )
+        if verdict in (Verdict.CAUTION, Verdict.NO_GO) and reasons:
+            # Only a verdict grounded in real threshold breaches is worth appending.
+            real = [r for r in reasons if "no forecast data" not in r]
+            if real:
+                answer += f" Conditions warning: {real[0]}"
+        return await translate_only(answer, language_code)
+
     # ── Safety answers are phrased by the risk agent ──────────────────────
     # It holds the verdict-communication rules (never soften, never re-decide), so the
     # answer for a safety check comes from there rather than being written twice.
@@ -428,6 +447,12 @@ def _deterministic_answer(state: OrcaState, intent: Intent) -> str:
         if gaps:
             return f"I cannot yet explain productivity changes near {place}. {gaps[0]}"
         return f"I could not measure a productivity trend near {place}."
+
+    if intent is Intent.ROUTE_PLANNING:
+        # The success path is handled earlier in write_answer; this is the failure case.
+        if gaps:
+            return f"I could not plan a route. {gaps[0]}"
+        return "I could not plan a route between those places."
 
     if intent is Intent.GENERAL:
         # Retrieval answers marine background questions ("what is a PFZ?", "what does

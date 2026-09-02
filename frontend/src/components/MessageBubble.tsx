@@ -14,6 +14,7 @@ import type { ChatMessage, Verdict } from "@/types/orca";
 interface Props {
   message: ChatMessage;
   onRetry?: (id: string) => void;
+  onSpeak?: (message: ChatMessage) => void;
 }
 
 const VERDICT_BADGE: Record<
@@ -25,7 +26,7 @@ const VERDICT_BADGE: Record<
   NO_GO: { text: "NO-GO", className: "bg-rose-600 text-white" },
 };
 
-export default function MessageBubble({ message, onRetry }: Props) {
+export default function MessageBubble({ message, onRetry, onSpeak }: Props) {
   const [showEvidence, setShowEvidence] = useState(false);
   const isUser = message.role === "user";
   const response = message.response;
@@ -86,6 +87,18 @@ export default function MessageBubble({ message, onRetry }: Props) {
 
             {response && response.evidence.length > 0 && (
               <>
+                {onSpeak && (
+                  <button
+                    type="button"
+                    onClick={() => onSpeak(message)}
+                    aria-label="Read this answer aloud"
+                    title="Read aloud"
+                    className="ml-2 mt-2 inline-flex items-center gap-1 rounded-md text-[11px] font-semibold text-ocean-600 transition-colors hover:text-ocean-500 dark:text-ocean-300"
+                  >
+                    🔊 Listen
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setShowEvidence((value) => !value)}

@@ -52,6 +52,7 @@ async def get_layer(
     lat: float | None = None,
     lon: float | None = None,
     radius_km: float = 200.0,
+    session_id: str | None = None,
 ) -> dict:
     """Return one map layer as a GeoJSON FeatureCollection.
 
@@ -113,6 +114,14 @@ async def get_layer(
                     )
                 ).model_dump(),
             ) from exc
+
+    # ── Route line, computed per query and held for the session ───────────
+    if layer is MapLayer.ROUTE_LINE:
+        from app.agents import route as route_agent
+
+        if not session_id:
+            return EMPTY
+        return route_agent.recall(session_id) or EMPTY
 
     # ── The user's own pin is a client-side concern ───────────────────────
     if layer is MapLayer.USER_PIN:

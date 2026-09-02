@@ -32,6 +32,7 @@ SPECIALIST_NODES = {
     "sea_state": nodes.sea_state_node,
     "marine_data": nodes.marine_data_node,
     "geospatial": nodes.geospatial_node,
+    "route": nodes.route_node,
 }
 
 # A planner loop or a runaway fan-out must not hang the demo. The longest legitimate path

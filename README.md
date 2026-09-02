@@ -8,10 +8,9 @@ tomorrow?"* — and a **supervisor agent** plans the task, dispatches **speciali
 fetch marine, weather and geospatial data, correlates the signals, and returns a **map + a
 verdict + the evidence and reasoning behind it**.
 
-> **Status: P1 — runs end-to-end.** Ask a question in the browser, get a real verdict from
-> real forecast data with a live agent trace. Golden queries #2 (safety) and #3 (geofencing)
-> are complete; #1 (fishing zones) needs a free Copernicus account — see
-> [Getting the data](#getting-the-data). See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: demo-ready.** All five golden queries answer end-to-end on real data, in five
+> languages, with a live agent trace, dark mode, voice in and out, and an offline demo mode.
+> See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 >
 > **It runs with no API keys at all.** Every agent has a deterministic fallback, so
 > language detection, intent classification, planning and the verdict all work keyless.
@@ -28,7 +27,7 @@ verdict + the evidence and reasoning behind it**.
 3. **Speaks the user's language.** Query in Tamil, get the answer in Tamil — via Bhashini,
    the Government of India's own Indic language stack.
 
-## Golden path — the four queries that must be flawless
+## Golden path — the queries that must be flawless
 
 | # | Query | Output |
 |---|-------|--------|
@@ -36,9 +35,11 @@ verdict + the evidence and reasoning behind it**.
 | 2 | "Is it safe to go to sea tomorrow morning near Kakinada?" | **Go / Caution / No-Go** card with reasons |
 | 3 | "Am I approaching any restricted boundary?" | Proximity alert vs IMBL / EEZ / MPA |
 | 4 | "Why has fish productivity declined in this region?" | Explainable narrative + chlorophyll trend chart |
+| 5 | "Plan a route from Kakinada to Chennai" | Least-risk path drawn on the map, costed at time of arrival |
 
-Plus one multi-turn beat — *"…and is it safe there?"* after #1 — to prove conversational memory.
-Route optimisation (#5) is a stretch goal. Full detail in [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
+Plus one multi-turn beat — *"…and is it safe there?"* after #1 — to prove conversational
+memory, and **voice**: ask by mic in your own language and hear the verdict read back.
+Full detail in [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
 ## Architecture
 
@@ -106,7 +107,7 @@ is live, and what command fixes anything missing. Check it before demoing.
 python -m app.adapters.open_meteo_marine     # real wave height for Kakinada
 python -m app.adapters.open_meteo_weather    # real wind + CAPE
 python -m app.adapters.open_meteo_geocoding  # Kakinada → 16.99, 82.24
-pytest backend/tests/                        # 52 tests, no network required
+pytest backend/tests/                        # 144 tests, no network required
 ```
 
 ## Getting the data
@@ -118,6 +119,11 @@ until it lands the responsible agent emits a visible `skipped` step naming the f
 |------|---------|-----|
 | **Gemini key** (free) | Answers in the user's language, better edge-case classification | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → `GEMINI_API_KEY` in `.env` |
 | **Groq key** (free) | Fallback when Gemini rate-limits | [console.groq.com](https://console.groq.com) → API Keys → Create → `GROQ_API_KEY` |
+| **Copernicus account** (free) | Golden query #1 — the computed PFZ proxy | [register](https://data.marine.copernicus.eu/register), then `copernicusmarine login` and `python scripts/fetch_copernicus_subset.py` |
+| **EEZ / IMBL polygons** | Golden query #3 — geofencing | `python scripts/download_geojson.py` — fetches both automatically from Marine Regions' public WFS, no form needed |
+| **MPA polygons** (optional) | Protected-area breach alerts | [Protected Planet](https://www.protectedplanet.net/country/IND) → accept terms → drop the zip in `data/geojson/raw/` and re-run the script |
+| **Knowledge base** (optional) | Answers to general marine questions | `python -m app.rag.ingest` — first run downloads a small embedding model |
+| **Bhashini** (optional) | Government of India NMT, preferred over the LLM for Indic output | [bhashini.gov.in/ulca](https://bhashini.gov.in/ulca) → `BHASHINI_USER_ID` + `BHASHINI_API_KEY` |
 
 > **Model names go stale.** `gemini-2.5-flash` and `llama-3.3-70b-versatile` (the original
 > defaults) are both retired for new keys and return 404. Defaults are now
@@ -131,11 +137,7 @@ until it lands the responsible agent emits a visible `skipped` step naming the f
 >
 > A dead model is not fatal — ORCA falls back to the deterministic path and answers
 > correctly in English. Check `/ready` and the trace's `[via …]` tag to tell which ran.
-| **Copernicus account** (free) | Golden query #1 — the computed PFZ proxy | [register](https://data.marine.copernicus.eu/register), then `copernicusmarine login` and `python scripts/fetch_copernicus_subset.py` |
-| **EEZ / IMBL polygons** | Golden query #3 — geofencing | `python scripts/download_geojson.py` — fetches both automatically from Marine Regions' public WFS, no form needed |
-| **MPA polygons** (optional) | Protected-area breach alerts | [Protected Planet](https://www.protectedplanet.net/country/IND) → accept terms → drop the zip in `data/geojson/raw/` and re-run the script |
-| **Knowledge base** (optional) | Answers to general marine questions | `python -m app.rag.ingest` — first run downloads a small embedding model |
-| **Bhashini** (optional) | Government of India NMT, preferred over the LLM for Indic output | [bhashini.gov.in/ulca](https://bhashini.gov.in/ulca) → `BHASHINI_USER_ID` + `BHASHINI_API_KEY` |
+
 
 ## Documentation
 

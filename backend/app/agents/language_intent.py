@@ -303,6 +303,34 @@ def extract_place_name(query: str) -> str | None:
     return None
 
 
+async def extract_route_endpoints(query: str) -> tuple[Location | None, Location | None]:
+    """Pull "from X to Y" out of a route query.
+
+    Route planning is the one intent needing two places, so it gets its own extraction
+    rather than complicating the single-location path every other query uses.
+
+    Returns (origin, destination); either may be None when the phrasing gives only one —
+    "plan a route to Chennai" has a destination and implies the current location as origin.
+    """
+    lowered = query.casefold()
+
+    # "from X to Y" — the explicit form.
+    match = re.search(r"\bfrom\s+(.+?)\s+to\s+(.+?)(?:[?.,]|$)", lowered)
+    if match:
+        origin = await geocode(match.group(1).strip())
+        destination = await geocode(match.group(2).strip())
+        return origin, destination
+
+    # "route to Y" / "sail to Y" — destination only.
+    match = re.search(r"\b(?:to|towards|for)\s+(.+?)(?:[?.,]|$)", lowered)
+    if match:
+        candidate = match.group(1).strip()
+        if candidate not in _NOT_A_PLACE:
+            return None, await geocode(candidate)
+
+    return None, None
+
+
 def _is_referential(query: str) -> bool:
     """Does this query point at a location from a previous turn?"""
     lowered = query.casefold()

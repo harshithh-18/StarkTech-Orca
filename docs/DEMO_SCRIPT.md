@@ -131,6 +131,33 @@ If Bhashini credentials are configured, add:
 
 ---
 
+## Route planning — query #5 · 45s
+
+Type: **"Plan a route from Kakinada to Chennai"**
+
+A line draws across the map.
+
+> "A* over the forecast wave grid, with land impassable. The part worth noticing: each
+> stretch is costed at the time the boat would actually *reach* it, not at departure.
+> Cost it all on departure conditions and you route straight into weather that arrives
+> four hours later — which is the exact mistake a route planner exists to prevent."
+
+Click the line for distance, duration and the peak wave along the way.
+
+---
+
+## Voice · 45s · *the closer*
+
+Click the **🎙 mic** and speak a query — Telugu works.
+
+> "Speech in, speech out, in the user's own language. The verdict is spoken first, because
+> someone on a boat may not hear the whole clip. This is the browser's own speech engine,
+> so it needs no API key — Bhashini's ASR and TTS are the production upgrade."
+
+Safety verdicts are read aloud automatically; everything else has a **🔊 Listen** button.
+
+---
+
 ## Multi-turn · 30s
 
 Ask query 1, then: **"…and is it safe there?"**

@@ -97,9 +97,24 @@ def test_route_drops_unknown_node_names():
     assert builder.route_after_planner({"plan": ["weather", "teleporter"]}) == ["weather"]
 
 
-def test_route_never_returns_the_unimplemented_route_node():
-    """agents/route.py is a P3 stretch stub that only raises — dispatching it would fail."""
-    assert "route" not in builder.SPECIALIST_NODES
+def test_route_is_dispatchable_now_that_it_is_built():
+    """Route planning was deliberately excluded until it existed (golden query #5, P3).
+
+    It is built now, so the planner may dispatch it — but every dispatchable name must
+    still resolve to a real node, which is the invariant this file actually protects.
+    """
+    from app.agents.planner import SPECIALISTS
+
+    assert "route" in builder.SPECIALIST_NODES
+    for name in SPECIALISTS:
+        assert name in builder.SPECIALIST_NODES, f"planner may dispatch {name!r} with no node"
+
+
+def test_every_node_the_router_can_return_is_registered():
+    """A router returning a name the graph has no node for fails deep and unreadably."""
+    for plan in ([], ["weather"], ["route"], ["weather", "sea_state", "route"]):
+        for name in builder.route_after_planner({"plan": plan}):
+            assert name in builder.SPECIALIST_NODES or name == "risk"
 
 
 # ── Planner ───────────────────────────────────────────────────────────────

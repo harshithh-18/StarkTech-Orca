@@ -23,7 +23,7 @@
  * came for and it must be readable without scrolling.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import AlertBanner from "@/components/AlertBanner";
 import ChatPanel from "@/components/ChatPanel";
@@ -38,7 +38,8 @@ import VerdictCard from "@/components/VerdictCard";
 import { useOrcaQuery } from "@/hooks/useOrcaQuery";
 import { useReasoningTrace } from "@/hooks/useReasoningTrace";
 import { useTheme } from "@/hooks/useTheme";
-import type { MapLayer, OrcaResponse } from "@/types/orca";
+import { useVoice } from "@/hooks/useVoice";
+import type { ChatMessage, Language, MapLayer, OrcaResponse } from "@/types/orca";
 
 /** The small-craft wave limit, mirrored from services/risk_rules.THRESHOLDS. */
 const WAVE_THRESHOLD_M = 2.5;
@@ -68,16 +69,36 @@ export default function App() {
 
   const trace = useReasoningTrace(sessionId);
 
+  // The language of the last answer — what dictation and speech should use next, since a
+  // Telugu speaker's follow-up will also be in Telugu.
+  const [voiceLanguage, setVoiceLanguage] = useState<Language>("en");
+  const askRef = useRef<((query: string) => void) | null>(null);
+
+  // A finished transcript is submitted immediately: making the user press send after
+  // speaking defeats the point of asking by voice.
+  const voice = useVoice((transcript) => askRef.current?.(transcript));
+  // Pulled out because `voice` is a fresh object each render while `speak` is a stable
+  // callback — depending on the object would rebuild every consumer on every render.
+  const { speak } = voice;
+
   const handleResponse = useCallback(
     (response: OrcaResponse) => {
       trace.settle(response);
+      setVoiceLanguage(response.language);
+
+      // Speak safety verdicts without being asked. Someone on a boat at 4 a.m. may not be
+      // looking at the screen, and the answer already leads with the verdict — so the
+      // first thing heard is "do not go to sea", not a preamble.
+      if (response.verdict && response.verdict !== "NOT_APPLICABLE") {
+        speak(response.answer, response.language);
+      }
       // A new answer picks its own layers; drop manual additions so the map reflects the
       // current question rather than accumulating every past one.
       setManualLayers([]);
       // On a phone, jump to the answer — that is what was asked for.
       setMobileTab(response.verdict || response.charts.length ? "answer" : "chat");
     },
-    [trace],
+    [trace, speak],
   );
 
   const { messages, latest, loading, error, coords, ask, retry, reset } = useOrcaQuery({
@@ -108,6 +129,19 @@ export default function App() {
     : coords
       ? { lat: coords.lat, lon: coords.lon, source: "gps" }
       : null;
+
+  askRef.current = ask;
+
+  const speakMessage = useCallback(
+    (message: ChatMessage) => {
+      if (voice.speaking) {
+        voice.stopSpeaking();
+        return;
+      }
+      voice.speak(message.text, message.response?.language ?? voiceLanguage);
+    },
+    [voice, voiceLanguage],
+  );
 
   const useGps = useCallback(() => {
     if (coords) setPicked({ ...coords, name: "My location", source: "gps" });
@@ -168,6 +202,16 @@ export default function App() {
               onUseGps={useGps}
             />
           </div>
+          {voice.speaking && (
+            <button
+              type="button"
+              onClick={voice.stopSpeaking}
+              title="Stop reading aloud"
+              className="flex h-8 items-center gap-1 rounded-lg border border-white/15 bg-white/10 px-2 text-xs font-medium transition-all hover:bg-white/20"
+            >
+              <span aria-hidden="true">🔊</span> Stop
+            </button>
+          )}
           {messages.length > 0 && (
             <button
               type="button"
@@ -231,7 +275,19 @@ export default function App() {
             mobileTab === "chat" ? "flex" : "hidden",
           ].join(" ")}
         >
-          <ChatPanel messages={messages} loading={loading} onAsk={ask} onRetry={retry} />
+          <ChatPanel
+            messages={messages}
+            loading={loading}
+            onAsk={ask}
+            onRetry={retry}
+            onSpeak={speakMessage}
+            voice={{
+              supported: voice.supported,
+              listening: voice.listening,
+              listen: () => voice.listen(voiceLanguage),
+              stopListening: voice.stopListening,
+            }}
+          />
         </section>
 
         {/* Map + answer */}
@@ -247,6 +303,7 @@ export default function App() {
               activeLayers={activeLayers}
               userLocation={userLocation}
               isDark={theme.isDark}
+              sessionId={sessionId}
             />
             <LayerToggles active={activeLayers} onToggle={toggleLayer} />
           </div>

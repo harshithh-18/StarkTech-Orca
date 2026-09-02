@@ -71,12 +71,13 @@ export async function postQuery(request: QueryRequest): Promise<OrcaResponse> {
 /** GET /api/layers/{layer} — GeoJSON for one map layer. */
 export async function getLayer(
   layer: MapLayer,
-  opts?: { lat?: number; lon?: number; radiusKm?: number },
+  opts?: { lat?: number; lon?: number; radiusKm?: number; sessionId?: string },
 ): Promise<GeoJSON.FeatureCollection> {
   const params = new URLSearchParams();
   if (opts?.lat !== undefined) params.set("lat", String(opts.lat));
   if (opts?.lon !== undefined) params.set("lon", String(opts.lon));
   if (opts?.radiusKm !== undefined) params.set("radius_km", String(opts.radiusKm));
+  if (opts?.sessionId) params.set("session_id", opts.sessionId);
 
   const query = params.toString();
   const response = await fetch(`/api/layers/${layer}${query ? `?${query}` : ""}`);
@@ -90,7 +91,7 @@ const layerCache = new Map<string, GeoJSON.FeatureCollection>();
 
 export async function getLayerCached(
   layer: MapLayer,
-  opts?: { lat?: number; lon?: number; radiusKm?: number },
+  opts?: { lat?: number; lon?: number; radiusKm?: number; sessionId?: string },
 ): Promise<GeoJSON.FeatureCollection> {
   // Round the key so tiny map pans don't miss the cache on every frame.
   const key = [
@@ -98,13 +99,18 @@ export async function getLayerCached(
     opts?.lat?.toFixed(1) ?? "-",
     opts?.lon?.toFixed(1) ?? "-",
     opts?.radiusKm ?? "-",
+    opts?.sessionId ?? "-",
   ].join(":");
 
-  const hit = layerCache.get(key);
-  if (hit) return hit;
+  // A route is recomputed per query within one session, so caching it would show the
+  // previous journey. Boundaries and grids are static and cache normally.
+  if (layer !== "route_line") {
+    const hit = layerCache.get(key);
+    if (hit) return hit;
+  }
 
   const collection = await getLayer(layer, opts);
-  layerCache.set(key, collection);
+  if (layer !== "route_line") layerCache.set(key, collection);
   return collection;
 }
 

@@ -351,6 +351,23 @@ async def risk_node(state: OrcaState) -> dict:
         )
         return {"verdict": None, "reasoning_trace": [step]}
 
+    # A route query dispatches only the route agent unless the planner also asked for
+    # weather — and route evidence carries no safety thresholds, so assessing it produces
+    # a bogus "no forecast data" CAUTION about a question nobody asked.
+    from app.services.risk_rules import THRESHOLDS
+
+    has_threshold_evidence = any(
+        e.field in THRESHOLDS for e in (state.get("evidence") or [])
+    )
+    if intent is Intent.ROUTE_PLANNING and not has_threshold_evidence:
+        step = collector.step(
+            "risk",
+            "Skipped: no wind or wave evidence was gathered for this route, so no "
+            "safety verdict applies",
+            status=TraceStatus.SKIPPED,
+        )
+        return {"verdict": None, "reasoning_trace": [step]}
+
     collector.step("risk", "Correlating evidence…", status=TraceStatus.STARTED)
 
     assessment = risk.assess(
@@ -373,8 +390,52 @@ async def risk_node(state: OrcaState) -> dict:
 
 
 async def route_node(state: OrcaState) -> dict:
-    """TODO(P3, E) — stretch. The planner never dispatches this; see agents/route.py."""
-    raise NotImplementedError("TODO(P3, E)")
+    """Golden query #5: least-risk path between two places."""
+
+    async def work() -> dict:
+        from app.agents import route as route_agent
+        from app.agents.language_intent import extract_route_endpoints
+
+        origin, destination = await extract_route_endpoints(state["query"])
+        # "route to Chennai" gives only a destination; the resolved query location is the
+        # implied starting point.
+        origin = origin or state.get("location")
+        if origin is None or destination is None:
+            raise route_agent.RouteUnavailable(
+                "a route needs two places — try “route from Kakinada to Chennai”"
+            )
+
+        result = await route_agent.plan_route(
+            origin, destination, (state.get("time_window") or {}).get("start")
+        )
+        # Held per session so the map can fetch the line: the response contract is frozen
+        # and has no field for geometry, and recomputing it on the layers request would
+        # mean a second A* run over a second forecast fetch.
+        route_agent.remember(state["session_id"], result["geojson"])
+
+        return {
+            "route": {
+                "geojson": result["geojson"],
+                "origin": origin,
+                "destination": destination,
+                "summary": (
+                    f"{result['distance_km']} km from {origin.name or 'your location'} "
+                    f"to {destination.name or 'the destination'}, about "
+                    f"{result['hours']:.0f} hours, peak wave {result['max_wave_m']} m "
+                    f"along the way."
+                ),
+            },
+            "evidence": result["evidence"],
+            "attribution": result["attribution"],
+            "_message": (
+                f"Route: {result['distance_km']} km, peak wave "
+                f"{result['max_wave_m']} m, ~{result['hours']:.0f} h"
+            ),
+        }
+
+    return await _run_specialist(
+        state, "route", work, "Planning a least-risk path…", source="Open-Meteo Marine"
+    )
 
 
 async def visualization_node(state: OrcaState) -> dict:

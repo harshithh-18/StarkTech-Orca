@@ -22,6 +22,8 @@ interface Props {
   activeLayers: MapLayer[];
   userLocation?: Location | null;
   isDark?: boolean;
+  /** Needed for route_line, which is computed per query and held per session. */
+  sessionId?: string;
 }
 
 // Leaflet's default marker icons are resolved by relative URL and break under a bundler.
@@ -47,10 +49,18 @@ const LAYER_STYLE: Partial<Record<MapLayer, L.PathOptions>> = {
   imbl_line: { color: "#f43f5e", weight: 3.5, fillOpacity: 0 },
   mpa_zones: { color: "#a78bfa", weight: 2, fillOpacity: 0.18 },
   pfz_zones: { color: "#22c55e", weight: 2, fillOpacity: 0.35 },
+  // The planned path: bright and thick, because it is the answer itself, not context.
+  route_line: { color: "#f59e0b", weight: 4, fillOpacity: 0, dashArray: "1 6", lineCap: "round" },
 };
 
 /** Layers served as GeoJSON polygons/lines from the backend. */
-const GEOJSON_LAYERS: MapLayer[] = ["pfz_zones", "eez_boundary", "imbl_line", "mpa_zones"];
+const GEOJSON_LAYERS: MapLayer[] = [
+  "pfz_zones",
+  "eez_boundary",
+  "imbl_line",
+  "mpa_zones",
+  "route_line",
+];
 
 /** Gridded point layers, rendered as a coloured scatter rather than vector outlines. */
 const HEATMAP_LAYERS: MapLayer[] = ["chlorophyll_heatmap", "sst_heatmap"];
@@ -138,13 +148,24 @@ function Recenter({ center }: { center: Location | null }) {
   return null;
 }
 
-function LayerData({ layer, center }: { layer: MapLayer; center: Location | null }) {
+function LayerData({
+  layer,
+  center,
+  sessionId,
+}: {
+  layer: MapLayer;
+  center: Location | null;
+  sessionId?: string;
+}) {
   const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    getLayerCached(layer, center ? { lat: center.lat, lon: center.lon } : undefined)
+    getLayerCached(
+      layer,
+      center ? { lat: center.lat, lon: center.lon, sessionId } : { sessionId },
+    )
       .then((collection) => {
         if (!cancelled) setData(collection);
       })
@@ -155,7 +176,7 @@ function LayerData({ layer, center }: { layer: MapLayer; center: Location | null
     return () => {
       cancelled = true;
     };
-  }, [layer, center?.lat, center?.lon]);
+  }, [layer, center?.lat, center?.lon, sessionId]);
 
   if (!data?.features?.length) return null;
 
@@ -177,6 +198,9 @@ function LayerData({ layer, center }: { layer: MapLayer; center: Location | null
             `SST gradient: ${props.sst_gradient_c_per_km} °C/km`,
           props.confidence != null && `Confidence: ${props.confidence}`,
           props.distance_km != null && `Distance: ${props.distance_km} km`,
+          props.distance_km != null && props.hours != null &&
+            `Route: ${props.distance_km} km, about ${props.hours} h`,
+          props.max_wave_m != null && `Peak wave on route: ${props.max_wave_m} m`,
           props.method && `Method: ${props.method}`,
           props.source && `Source: ${props.source}`,
         ].filter(Boolean);
@@ -191,7 +215,7 @@ function LayerData({ layer, center }: { layer: MapLayer; center: Location | null
   );
 }
 
-export default function MapView({ center, activeLayers, userLocation, isDark = false }: Props) {
+export default function MapView({ center, activeLayers, userLocation, isDark = false, sessionId }: Props) {
   const pin = userLocation ?? center;
 
   return (
@@ -220,7 +244,7 @@ export default function MapView({ center, activeLayers, userLocation, isDark = f
       {activeLayers
         .filter((layer) => GEOJSON_LAYERS.includes(layer))
         .map((layer) => (
-          <LayerData key={layer} layer={layer} center={center} />
+          <LayerData key={layer} layer={layer} center={center} sessionId={sessionId} />
         ))}
 
       {pin && (

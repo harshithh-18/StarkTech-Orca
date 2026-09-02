@@ -102,8 +102,15 @@ streaming. This is essentially the final demo; P3 only makes it survivable.
 - [ ] Deck built — **all**
 - [ ] Deployed to Vercel + HF Spaces so judges have a link — **B + D**
 
-**Stretch, only if the above is genuinely done** — voice I/O (**F**), route optimisation
-(**E**), CV front/eddy detection (**F**), proactive alerts.
+**Stretch, only if the above is genuinely done:**
+
+- [x] **Voice I/O** — ask by mic, answers read aloud, safety verdicts spoken automatically.
+      Browser-native Web Speech API, so it needs no credentials; Bhashini ASR/TTS remains
+      the documented upgrade. — **F**
+- [x] **Route optimisation** (golden query #5) — A* over a forecast wave grid, costed at
+      estimated time of arrival, land impassable. — **E**
+- [ ] CV front/eddy detection — **F**
+- [ ] Proactive alerts
 
 **Demo at end of P3:** the whole thing, from a cold laptop, with the Wi-Fi turned off.
 
