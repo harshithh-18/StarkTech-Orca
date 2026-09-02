@@ -151,6 +151,7 @@ until it lands the responsible agent emits a visible `skipped` step naming the f
 | [TEAM.md](docs/TEAM.md) | You're not sure whose file you're about to edit |
 | [DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | Rehearsal week |
 | [CONTRIBUTING.md](docs/CONTRIBUTING.md) | Before your first PR |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | You're hosting it — **read before importing to Vercel** |
 
 ## Timeline
 

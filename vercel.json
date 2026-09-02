@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "installCommand": "echo 'install runs inside buildCommand'",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/((?!api|ws|assets|favicon).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

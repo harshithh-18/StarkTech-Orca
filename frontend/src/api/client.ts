@@ -9,6 +9,24 @@
 
 import type { ErrorDetail, MapLayer, OrcaResponse, QueryRequest } from "@/types/orca";
 
+/**
+ * Where the backend lives.
+ *
+ * Empty by default, which keeps every request origin-relative — Vite proxies `/api` to
+ * localhost:8000 in dev, and that is also correct if the API is served from the same
+ * origin in production.
+ *
+ * Set `VITE_ORCA_API_BASE` when the frontend and backend are deployed separately (a
+ * Vercel frontend talking to a backend on Render or HF Spaces, say):
+ *
+ *     VITE_ORCA_API_BASE=https://orca-api.example.com
+ *
+ * This is the ONLY environment variable the frontend reads. Every other ORCA variable is
+ * backend configuration and must never be set on a frontend host — API keys given to a
+ * `VITE_`-prefixed variable are compiled into public JavaScript.
+ */
+export const API_BASE = (import.meta.env.VITE_ORCA_API_BASE ?? "").replace(/\/$/, "");
+
 /** An API error carrying the backend's structured detail, including the actionable hint. */
 export class OrcaApiError extends Error {
   readonly code: string;
@@ -58,7 +76,7 @@ async function parseError(response: Response): Promise<OrcaApiError> {
 
 /** POST /api/query — run one turn through the agent graph. */
 export async function postQuery(request: QueryRequest): Promise<OrcaResponse> {
-  const response = await fetch("/api/query", {
+  const response = await fetch(`${API_BASE}/api/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -80,7 +98,9 @@ export async function getLayer(
   if (opts?.sessionId) params.set("session_id", opts.sessionId);
 
   const query = params.toString();
-  const response = await fetch(`/api/layers/${layer}${query ? `?${query}` : ""}`);
+  const response = await fetch(
+    `${API_BASE}/api/layers/${layer}${query ? `?${query}` : ""}`,
+  );
 
   if (!response.ok) throw await parseError(response);
   return (await response.json()) as GeoJSON.FeatureCollection;
@@ -116,7 +136,7 @@ export async function getLayerCached(
 
 /** GET /health */
 export async function getHealth(): Promise<{ status: string; version: string }> {
-  const response = await fetch("/health");
+  const response = await fetch(`${API_BASE}/health`);
   if (!response.ok) throw await parseError(response);
   return (await response.json()) as { status: string; version: string };
 }

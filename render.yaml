@@ -1,0 +1,63 @@
+# Render blueprint for the ORCA backend.
+#
+# Owner: B · Phase: P3
+#
+#   Render dashboard → New → Blueprint → point at this repo.
+#
+# The frontend deploys separately to Vercel (see docs/DEPLOYMENT.md); this file describes
+# the API only.
+#
+# ⚠️ Every `sync: false` value below must be set by hand in the Render dashboard. They are
+# secrets and must never be committed.
+
+services:
+  - type: web
+    name: orca-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore # closest to the Indian Ocean data sources and the demo audience
+    healthCheckPath: /health
+
+    # A disk means the Copernicus subsets survive a restart instead of re-downloading
+    # 60 MB on every cold start. Free tier has no disks — on free, the bootstrap re-runs
+    # on each cold start and marine queries degrade for the first minute or two.
+    # disk:
+    #   name: orca-data
+    #   mountPath: /app/data
+    #   sizeGB: 1
+
+    envVars:
+      # ── Required ──────────────────────────────────────────────────────
+      # Must be the exact Vercel origin, scheme included, no trailing slash.
+      # Wrong value = requests fail in the browser but work from curl.
+      - key: ORCA_CORS_ORIGINS
+        sync: false
+
+      # ── LLM: answers in the user's language. Without these ORCA still ──
+      # ── answers correctly, in English, via the deterministic path. ─────
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+
+      # ── Copernicus: unlocks golden queries #1 and #4 ──────────────────
+      - key: COPERNICUS_USERNAME
+        sync: false
+      - key: COPERNICUS_PASSWORD
+        sync: false
+
+      # ── Defaults that rarely need changing ────────────────────────────
+      - key: GEMINI_MODEL
+        value: gemini-flash-latest
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: ORCA_USE_MOCK_DATA
+        value: "false"
+      - key: ORCA_LOG_LEVEL
+        value: INFO
+      - key: ORCA_CACHE_TTL_SECONDS
+        value: "3600"
+      # Days of history fetched at boot. Lower = faster cold start, shorter trend for #4.
+      - key: ORCA_BOOTSTRAP_DAYS
+        value: "45"

@@ -7,6 +7,7 @@
  * lost, and the first step (language + intent) is the one that sets up the whole story.
  */
 
+import { API_BASE } from "@/api/client";
 import type { TraceEvent } from "@/types/orca";
 
 export interface TraceSocket {
@@ -39,9 +40,12 @@ export function connectTraceSocket(
   const open = () => {
     if (closedByCaller) return;
 
-    // Same-origin, so this works behind the Vite proxy in dev and unchanged in prod.
-    const scheme = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const url = `${scheme}//${window.location.host}/ws/trace/${encodeURIComponent(sessionId)}`;
+    // Follows API_BASE so the socket reaches the same backend the REST calls do. With no
+    // base set this stays same-origin, which is correct behind the Vite dev proxy.
+    const base = API_BASE
+      ? API_BASE.replace(/^http/, "ws")
+      : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`;
+    const url = `${base}/ws/trace/${encodeURIComponent(sessionId)}`;
 
     try {
       socket = new WebSocket(url);

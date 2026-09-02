@@ -1,0 +1,26 @@
+# Keep the build context small and credentials out of image layers.
+
+.git
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+
+# Secrets — never copied into an image.
+.env
+
+# The frontend deploys separately (Vercel); it is not part of the backend image.
+frontend
+
+# Large, regenerable, and fetched at container start by scripts/bootstrap_data.py.
+data/copernicus
+data/geojson
+data/cache
+data/chroma
+
+# data/knowledge IS copied — it is authored source for the RAG store, not downloaded.
+
+docs
+*.md
+!backend/README.md
