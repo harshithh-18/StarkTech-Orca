@@ -154,4 +154,8 @@ export interface ChatMessage {
   text: string;
   response?: OrcaResponse;
   pending?: boolean;
+  /** The turn failed; `text` holds the error. Kept in the list so it can be retried. */
+  failed?: boolean;
+  /** The original query, so a failed turn can be re-sent without retyping it. */
+  query?: string;
 }

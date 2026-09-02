@@ -8,8 +8,14 @@ tomorrow?"* — and a **supervisor agent** plans the task, dispatches **speciali
 fetch marine, weather and geospatial data, correlates the signals, and returns a **map + a
 verdict + the evidence and reasoning behind it**.
 
-> **Status: scaffold.** This repo currently contains the architecture, the frozen API
-> contract, and stub modules. Nothing runs end-to-end yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: P1 — runs end-to-end.** Ask a question in the browser, get a real verdict from
+> real forecast data with a live agent trace. Golden queries #2 (safety) and #3 (geofencing)
+> are complete; #1 (fishing zones) needs a free Copernicus account — see
+> [Getting the data](#getting-the-data). See [docs/ROADMAP.md](docs/ROADMAP.md).
+>
+> **It runs with no API keys at all.** Every agent has a deterministic fallback, so
+> language detection, intent classification, planning and the verdict all work keyless.
+> Adding a Gemini or Groq key upgrades phrasing and lets ORCA answer in the user's language.
 
 ---
 
@@ -78,21 +84,55 @@ Orca/
 
 ## Quickstart
 
-> ⚠️ **Not yet runnable.** Dependencies are declared but not installed, and every agent,
-> adapter and route is a stub raising `NotImplementedError`. These are the commands that
-> will work once P1 lands.
-
 ```bash
-cp .env.example .env          # then fill in your keys
+cp .env.example .env          # keys are optional — see below
 
 # Backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r backend/requirements.txt
 uvicorn app.main:app --reload --app-dir backend    # → http://localhost:8000/docs
 
-# Frontend
+# Frontend (in a second terminal)
 cd frontend && npm install && npm run dev          # → http://localhost:5173
 ```
+
+Then ask *"Is it safe to go to sea tomorrow morning near Kakinada?"*
+
+**`GET /ready` tells you what's wired up** — which data sources loaded, whether an LLM key
+is live, and what command fixes anything missing. Check it before demoing.
+
+```bash
+# The P0 spikes still work standalone, straight against the live APIs:
+python -m app.adapters.open_meteo_marine     # real wave height for Kakinada
+python -m app.adapters.open_meteo_weather    # real wind + CAPE
+python -m app.adapters.open_meteo_geocoding  # Kakinada → 16.99, 82.24
+pytest backend/tests/                        # 52 tests, no network required
+```
+
+## Getting the data
+
+Nothing below blocks you from running ORCA — each one unlocks a specific capability, and
+until it lands the responsible agent emits a visible `skipped` step naming the fix.
+
+| What | Unlocks | How |
+|------|---------|-----|
+| **Gemini key** (free) | Answers in the user's language, better edge-case classification | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → `GEMINI_API_KEY` in `.env` |
+| **Groq key** (free) | Fallback when Gemini rate-limits | [console.groq.com](https://console.groq.com) → API Keys → Create → `GROQ_API_KEY` |
+
+> **Model names go stale.** `gemini-2.5-flash` and `llama-3.3-70b-versatile` (the original
+> defaults) are both retired for new keys and return 404. Defaults are now
+> `gemini-flash-latest` — an alias, so it tracks the current model instead of pinning a
+> version that expires — and `openai/gpt-oss-120b` on Groq. Check what a key can reach:
+>
+> ```bash
+> curl "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY"
+> curl https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"
+> ```
+>
+> A dead model is not fatal — ORCA falls back to the deterministic path and answers
+> correctly in English. Check `/ready` and the trace's `[via …]` tag to tell which ran.
+| **Copernicus account** (free) | Golden query #1 — the computed PFZ proxy | [register](https://data.marine.copernicus.eu/register), then `copernicusmarine login` and `python scripts/fetch_copernicus_subset.py` |
+| **EEZ / IMBL / MPA polygons** | Golden query #3 — geofencing | `python scripts/download_geojson.py` prints the two download links and converts what you drop in |
 
 ## Documentation
 

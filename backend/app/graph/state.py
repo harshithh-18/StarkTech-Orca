@@ -15,12 +15,37 @@ from app.schemas.enums import AlertType, Intent, Language, MapLayer, Verdict
 from app.schemas.response import ChartSpec, Evidence, Location, TraceStep
 
 
+class Reset(list):
+    """Sentinel telling ``append`` to clear the field instead of extending it.
+
+    Needed because the checkpointer preserves state across turns of a conversation: on a
+    second turn the accumulators would otherwise still hold the first turn's evidence and
+    trace, and the panel would render every step twice. Passing ``RESET`` for these
+    fields in the initial state starts each turn clean while leaving the remembered
+    location intact — which is the whole point of keying the checkpointer by session.
+    """
+
+
+RESET = Reset()
+
+# Fields that must be cleared at the start of every turn. Each uses the append reducer,
+# so without an explicit reset they grow for the life of the conversation.
+PER_TURN_ACCUMULATORS = ("evidence", "reasoning_trace", "alerts", "skipped_agents", "attribution")
+
+
 def append(existing: list, new: list) -> list:
     """Reducer for accumulating lists across parallel nodes.
 
-    TODO(P1, A): return existing + new, tolerating None on either side.
+    Tolerates None on either side: a node that returns no evidence returns nothing at
+    all, and LangGraph passes the missing key through as None on the first write.
     """
-    raise NotImplementedError("TODO(P1, A)")
+    if isinstance(new, Reset):
+        return []
+    if not existing:
+        return list(new or [])
+    if not new:
+        return list(existing)
+    return list(existing) + list(new)
 
 
 class OrcaState(TypedDict, total=False):
@@ -34,6 +59,9 @@ class OrcaState(TypedDict, total=False):
     # ── Input ─────────────────────────────────────────────────────────────
     query: str
     session_id: str
+    input_lat: float | None      # device GPS as supplied on the request
+    input_lon: float | None
+    session_context: dict[str, Any]  # carried from the previous turn's checkpoint
 
     # ── Language + Intent agent ───────────────────────────────────────────
     language: Language
@@ -54,11 +82,20 @@ class OrcaState(TypedDict, total=False):
     # ── Risk ──────────────────────────────────────────────────────────────
     verdict: Verdict | None
     verdict_reasons: list[str]  # which rules fired, in plain English
-    alerts: list[AlertType]
 
     # ── Accumulated across parallel nodes (append-only) ───────────────────
     evidence: Annotated[list[Evidence], append]
     reasoning_trace: Annotated[list[TraceStep], append]
+
+    # Appended, not overwritten: geofence alerts are raised by the geospatial node and
+    # weather/wave alerts by the risk node further down the graph. Last-write-wins here
+    # would silently drop the geofence alerts — a boundary warning is exactly the one we
+    # cannot afford to lose.
+    alerts: Annotated[list[AlertType], append]
+
+    # Which specialists could not run. The risk node reads this to cap the verdict at
+    # CAUTION, so it must accumulate across every parallel branch that failed.
+    skipped_agents: Annotated[list[str], append]
 
     # ── Presentation ──────────────────────────────────────────────────────
     answer: str

@@ -25,9 +25,28 @@ class Settings(BaseSettings):
 
     # ── LLM ───────────────────────────────────────────────────────────────
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+
+    gemini_model: str = "gemini-flash-latest"
+    """A moving alias, deliberately, not a pinned version.
+
+    The scaffold pinned `gemini-2.5-flash`, which Google retired for new API keys — it
+    still appears in the models listing but returns 404 on generateContent, so the whole
+    LLM layer failed silently into the deterministic fallback. The alias tracks whatever
+    the current Flash model is and cannot go stale the same way.
+
+    Verify what a key can actually reach:
+        curl "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY"
+    """
+
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"
+
+    groq_model: str = "openai/gpt-oss-120b"
+    """Groq retired `llama-3.3-70b-versatile`; this is its replacement here.
+
+    Avoid `qwen/qwen3.6-27b` — it emits its `<think>` reasoning inline, which would land
+    verbatim in a fisherman's safety advisory. Check availability with:
+        curl https://api.groq.com/openai/v1/models -H "Authorization: Bearer $GROQ_API_KEY"
+    """
 
     # ── Multilingual ──────────────────────────────────────────────────────
     bhashini_user_id: str = ""
