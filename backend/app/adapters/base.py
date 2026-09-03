@@ -89,6 +89,20 @@ class AdapterError(Exception):
     """
 
 
+class LocationNotAtSea(AdapterError):
+    """The requested point has no ocean within range.
+
+    Its own type because **it is not a failure**, and treating it as one produces the
+    single most misleading answer this system can give. Asked "is it safe to sail?" from
+    an inland city, a generic adapter failure caps the verdict at CAUTION and says "sea
+    state data was unavailable, treat this as provisional" — which reads as *the sea near
+    you might be rough*, when the truth is *you are 280 km from any sea at all*.
+
+    Callers catch this specifically and say so. See ``graph.nodes._run_specialist`` and
+    ``services.conditions.snapshot``.
+    """
+
+
 class DataTier(str, Enum):
     """Which rung of the cascade actually served a response."""
 

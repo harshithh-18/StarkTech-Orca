@@ -228,7 +228,17 @@ async def complete_in_language(
         f"- Do NOT interpret or characterise the data. Never call a value high, low, "
         f"good, poor, rising or falling, and never state a cause or consequence, unless "
         f"the facts say so in those words. Report the values and what the facts state "
-        f"about them; nothing more."
+        f"about them; nothing more.\n"
+        # The reader is a fisherman, not a maritime lawyer. Handed the sentence "You are
+        # inside India's own waters", the model helpfully "corrected" it to "You are
+        # inside India's EEZ" — replacing plain language chosen on purpose with an
+        # acronym the reader has never seen. Field names in the facts are machine keys,
+        # not vocabulary to copy out.
+        f"- Write in plain language. NEVER use the abbreviations EEZ, IMBL, MPA, PFZ, "
+        f"SST or CAPE, and never expand them into their official names. Say 'India's own "
+        f"waters', 'the sea border with a neighbouring country', 'a protected marine "
+        f"area', 'a fishing zone', 'sea temperature' and 'storm energy' instead. Do not "
+        f"copy machine field names such as 'distance_to_imbl' into the answer."
     )
 
     return await complete(prompt + grounding, system=system, **kwargs)

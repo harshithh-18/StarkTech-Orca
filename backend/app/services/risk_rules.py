@@ -92,17 +92,35 @@ def breaches(field: str, value: float) -> str | None:
     return None
 
 
+# What each field is called when a person reads it. De-underscoring the machine key is
+# not enough: it produced "cape 2190 J/kg exceeds the 1000 J/kg small-craft threshold" in
+# a safety verdict, which tells a fisherman nothing — CAPE is a meteorological term and
+# "cape" is a headland. These reasons are the most-read text the system produces.
+FIELD_LABELS = {
+    "wave_height": "wave height",
+    "swell_wave_height": "swell height",
+    "wind_speed_10m": "wind speed",
+    "wind_gusts_10m": "wind gusts",
+    "cape": "storm energy",
+    "visibility": "visibility",
+}
+
+
+def field_label(field: str) -> str:
+    """The reader-facing name of a threshold field."""
+    return FIELD_LABELS.get(field, field.replace("_10m", "").replace("_", " "))
+
+
 def format_reason(field: str, value: float, threshold: float, unit: str, source: str) -> str:
     """One human-readable reason line, in English; translated later by agents.risk.
 
     Names the value, the limit and the source, so the user can check the claim rather
     than take it on trust: that is what makes the citation meaningful.
     """
-    label = field.replace("_10m", "").replace("_", " ")
-    comparator = "below" if field in LOWER_IS_WORSE else "exceeds"
+    comparator = "is below" if field in LOWER_IS_WORSE else "is over"
     return (
-        f"{label} {value:g} {unit} {comparator} the {threshold:g} {unit} "
-        f"small-craft threshold (source: {source})"
+        f"{field_label(field)} {value:g} {unit} {comparator} the {threshold:g} {unit} "
+        f"limit for small boats (source: {source})"
     )
 
 

@@ -20,6 +20,8 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 
+from app.adapters import open_meteo_marine
+from app.adapters.base import LocationNotAtSea
 from app.agents import (
     geospatial,
     language_intent,
@@ -32,8 +34,8 @@ from app.agents import (
 )
 from app.agents.base import get_collector
 from app.graph.state import OrcaState
-from app.schemas.enums import AlertType, Intent, TraceStatus
-from app.services import explainability
+from app.schemas.enums import AlertType, Intent, TraceStatus, Verdict
+from app.services import explainability, harbours
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,17 @@ async def _run_specialist(
             source=source,
             duration_ms=elapsed,
         )
-        return {"reasoning_trace": [step], "skipped_agents": [name]}
+        skipped: dict = {"reasoning_trace": [step], "skipped_agents": [name]}
+
+        # "There is no sea here" is not a missing data source, and conflating the two
+        # produces the worst answer this system can give: asked from an inland city, a
+        # generic skip caps the verdict at CAUTION and reports "sea state unavailable —
+        # treat as provisional", which reads as *the sea near you might be rough*. It is
+        # flagged on the state instead so the risk node can say the true thing.
+        if isinstance(exc, (LocationNotAtSea, marine_data.LocationNotAtSea)):
+            skipped["inland"] = True
+
+        return skipped
 
     elapsed = int((time.monotonic() - started) * 1000)
     message = delta.pop("_message", f"{name} completed")
@@ -155,11 +167,32 @@ async def weather_node(state: OrcaState) -> dict:
             if peak
             else f"{len(evidence)} weather values"
         )
+
+        # Cyclone check. Best effort and additive: it never fails the weather node, but a
+        # detected system feeds `cyclone_bulletin_active` into the risk rules, which is
+        # what raises the CYCLONE alert and caps the verdict.
+        cyclone_summary = ""
+        try:
+            cyclone = await weather.check_cyclone_alerts(state["location"])
+            evidence = list(evidence) + cyclone
+            system = next(
+                (e for e in cyclone if e.field == "cyclone_system_class"), None
+            )
+            active = next(
+                (e for e in cyclone if e.field == "cyclone_bulletin_active"), None
+            )
+            if system is not None:
+                cyclone_summary = f"; {system.value} detected nearby"
+            elif active is not None and active.value is False:
+                cyclone_summary = "; no tropical system detected"
+        except Exception as exc:  # noqa: BLE001 - the wind data still stands
+            logger.info("weather: cyclone proxy failed (%s)", exc)
+
         return {
             "weather": {"evidence": evidence},
             "evidence": evidence,
             "attribution": [weather.ATTRIBUTION],
-            "_message": f"Open-Meteo weather: {summary}",
+            "_message": f"Open-Meteo weather: {summary}{cyclone_summary}",
         }
 
     return await _run_specialist(
@@ -183,6 +216,17 @@ async def sea_state_node(state: OrcaState) -> dict:
             charts.append(await sea_state.fetch_forecast_chart(state["location"]))
         except Exception as exc:  # noqa: BLE001 - a missing chart is not a failed answer
             logger.info("sea_state: could not build the wave chart (%s)", exc)
+
+        # Tide rides along on the same cached marine request, so it costs no extra call.
+        # "What are the tide, weather and sea conditions near my fishing location?" is one
+        # of the problem statement's own example queries, and a sea-state answer with no
+        # tide in it does not answer it.
+        try:
+            tide_chart, tide_evidence = await sea_state.fetch_tides(state["location"])
+            charts.append(tide_chart)
+            evidence = list(evidence) + tide_evidence
+        except Exception as exc:  # noqa: BLE001
+            logger.info("sea_state: could not build the tide curve (%s)", exc)
 
         return {
             "sea_state": {"evidence": evidence, "charts": charts},
@@ -214,14 +258,23 @@ async def marine_data_node(state: OrcaState) -> dict:
         if nearest:
             evidence.extend(nearest.get("evidence", []))
 
+        # The thermal front is the *reason* a zone is a zone. Adding it turns "there is a
+        # fishing zone 38 km north-east" into "there is a fishing zone 38 km north-east,
+        # on the edge of a 200 km temperature front" — the second is an explanation, and
+        # explanation is the thing this platform is supposed to deliver.
+        front = await _detect_fronts(state["location"])
+        if front:
+            evidence.extend(front["evidence"])
+
         count = len(result["geojson"]["features"])
         summary = (
             f"{count} zone{'s' if count != 1 else ''} via {result['path']}"
             + (f", nearest {nearest['description']}" if nearest else "")
+            + (f"; {front['count']} thermal front(s) detected" if front else "")
         )
 
         return {
-            "marine": {**result, "nearest": nearest},
+            "marine": {**result, "nearest": nearest, "fronts": front},
             "evidence": evidence,
             "attribution": result["attribution"],
             "_message": f"Fishing zones: {summary}",
@@ -232,12 +285,62 @@ async def marine_data_node(state: OrcaState) -> dict:
     )
 
 
+async def _detect_fronts(location) -> dict | None:
+    """Thermal fronts near a point, or None when they cannot be computed.
+
+    Best-effort by design: fronts enrich the explanation, they are not the answer. If the
+    Copernicus subset is missing the fishing-zone answer must still ship, so this returns
+    None rather than raising into the specialist wrapper and marking the whole node
+    skipped.
+    """
+    import anyio
+
+    from app.services import fronts
+
+    box = {
+        "lat_min": location.lat - 2.5,
+        "lat_max": location.lat + 2.5,
+        "lon_min": location.lon - 2.5,
+        "lon_max": location.lon + 2.5,
+    }
+    try:
+        # NumPy over a NetCDF grid: off the event loop, or it stalls every concurrent run.
+        collection = await anyio.to_thread.run_sync(lambda: fronts.detect(box))
+    except Exception as exc:  # noqa: BLE001 - enrichment, never a failure
+        logger.info("marine_data: front detection unavailable (%s)", exc)
+        return None
+
+    if not collection.get("features"):
+        return None
+
+    # The geometry deliberately does NOT go into the graph state. It is a few hundred
+    # NumPy-derived coordinates that the checkpointer would have to serialise on every
+    # turn, and the map fetches the same collection from /api/layers/ocean_fronts anyway.
+    # Only the conclusion travels.
+    return {
+        "count": len(collection["features"]),
+        "evidence": fronts.front_evidence(location, collection),
+        "narrative": fronts.describe(location, collection),
+    }
+
+
 async def _productivity_trend(state: OrcaState) -> dict:
     """Golden query #4: chlorophyll and SST over time, plus the narrative."""
 
     async def work() -> dict:
         evidence, chart = await marine_data.get_productivity_trend(state["location"])
         narrative = marine_data.describe_trend(evidence, state["location"])
+
+        # "Why has productivity declined?" is partly a question about physical structure:
+        # water with no thermal front in it has nothing concentrating the plankton, and
+        # saying so is a real part of the explanation rather than a garnish.
+        front = await _detect_fronts(state["location"])
+        if front:
+            evidence = list(evidence) + front["evidence"]
+            # Not `.capitalize()` — that would lowercase everything after the first
+            # letter and turn "0.033 °C/km" into "0.033 °c/km".
+            sentence = front["narrative"]
+            narrative = f"{narrative} {sentence[0].upper()}{sentence[1:]}."
 
         change = next(
             (e for e in evidence if e.field == "chlorophyll_change_pct"), None
@@ -254,6 +357,7 @@ async def _productivity_trend(state: OrcaState) -> dict:
                 "evidence": evidence,
                 "charts": [chart],
                 "narrative": narrative,
+                "fronts": front,
             },
             "evidence": evidence,
             "charts": [chart],
@@ -303,16 +407,17 @@ async def geospatial_node(state: OrcaState) -> dict:
         # gets boats detained, and a warning buried after three distances is no warning.
         if AlertType.GEOFENCE_BREACH in alerts:
             answer = (
-                "WARNING — you are inside a restricted maritime zone. Leave the area. "
-                + answer
+                "WARNING — you are inside a protected marine area, where fishing may be "
+                "restricted or banned. Leave the area. " + answer
             )
         elif AlertType.GEOFENCE_PROXIMITY in alerts:
             imbl = by_field.get("distance_to_imbl")
-            distance_text = f"{imbl.value} km" if imbl else "very close"
+            distance_text = f"only {imbl.value} km" if imbl else "very close to"
             answer = (
-                f"WARNING — you are only {distance_text} from an international maritime "
-                f"boundary. Crossing it without authorisation can result in detention by "
-                f"the neighbouring coast guard. Turn back toward Indian waters. " + answer
+                f"WARNING — you are {distance_text} from the sea border with a "
+                f"neighbouring country. Crossing it without permission can get your boat "
+                f"seized and your crew detained by the other country's coast guard. Turn "
+                f"back towards Indian waters. " + answer
             )
 
         return {
@@ -342,6 +447,36 @@ async def risk_node(state: OrcaState) -> dict:
     collector = get_collector(state["session_id"])
     started = time.monotonic()
     intent = state.get("intent", Intent.GENERAL)
+
+    # ── There is no sea here ──────────────────────────────────────────────
+    # Checked before everything else. A safety verdict about a place with no sea in it is
+    # not a cautious answer, it is a meaningless one — and "CAUTION: sea state data was
+    # unavailable" actively misleads, because it implies there is a sea nearby that we
+    # could not read. Say the true thing and point at the nearest coast instead.
+    if state.get("inland"):
+        location = state.get("location")
+        where = (
+            harbours.describe_nearest(location)
+            if location is not None
+            else "The nearest coast could not be worked out."
+        )
+        reason = (
+            f"{(location.name if location and location.name else 'This location')} is "
+            f"inland — there is no sea within "
+            f"{int(open_meteo_marine.SAMPLE_RADIUS_KM)} km of it, so there are no waves, "
+            f"tides or sea conditions to report. {where}"
+        )
+        step = collector.step(
+            "risk",
+            f"No verdict: the location is inland. {where}",
+            status=TraceStatus.SKIPPED,
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        return {
+            "verdict": Verdict.NOT_APPLICABLE,
+            "verdict_reasons": [reason],
+            "reasoning_trace": [step],
+        }
 
     if intent not in SAFETY_INTENTS:
         step = collector.step(

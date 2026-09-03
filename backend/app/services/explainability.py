@@ -130,12 +130,20 @@ MARINE_INTENTS = frozenset(
 
 
 def _is_inland_result(state: OrcaState) -> bool:
-    """Did a data specialist skip because the point is on land?
+    """Did a data specialist skip because the point has no sea near it?
 
-    Read from the trace rather than recomputed: the specialists already made the
-    determination against the marine grid, and asking again would be a second network
-    round trip to reach the same answer.
+    The `inland` flag set by ``nodes._run_specialist`` is authoritative — it comes from a
+    typed exception, ``adapters.base.LocationNotAtSea``, raised by the code that actually
+    looked at the marine grid.
+
+    The trace scan below it is a fallback for a specialist that reports the condition in
+    words without raising that type. It is deliberately second: matching on the word
+    "inland" in a free-text message was the *only* mechanism until P4, and it silently
+    stopped working the moment that message was reworded — the kind of coupling that fails
+    quietly and is only noticed when a user in Hyderabad is told the sea might be rough.
     """
+    if state.get("inland"):
+        return True
     for step in state.get("reasoning_trace") or []:
         if step.agent in DATA_SPECIALISTS and "inland" in step.message.casefold():
             return True
@@ -281,12 +289,20 @@ async def write_answer(state: OrcaState) -> str:
     # explanation, and it must not be rewritten — handed to the model it gets recast
     # using whatever unrelated evidence is lying around ("you are not inside the EEZ").
     if intent in MARINE_INTENTS and _is_inland_result(state):
+        from app.services import harbours
+
         location = state.get("location")
         where = location.name if location and location.name else "That location"
+        # Name the nearest harbour rather than listing three arbitrary ones. "Try Kakinada"
+        # is advice; "try Kakinada, Chennai or Kochi" is a menu the reader has to work out
+        # for themselves, from a place none of them may be anywhere near.
+        nearby = (
+            f" {harbours.describe_nearest(location)}" if location is not None else ""
+        )
         message = (
-            f"{where} is inland, so there is no marine forecast for it. "
-            f"Name a coastal place — for example \u201cnear Kakinada\u201d, "
-            f"\u201coff Chennai\u201d or \u201cKochi\u201d — and I can answer for the water there."
+            f"{where} is inland — there is no sea near it, so there are no waves, tides "
+            f"or sea conditions to report.{nearby} Ask again from a coastal place and I "
+            f"can answer for the water there."
         )
         return await translate_only(message, language_code)
 
@@ -305,6 +321,17 @@ async def write_answer(state: OrcaState) -> str:
             if language_code == "en":
                 return warning
             return await translate_only(warning, language_code)
+
+    # ── A boundary answer is deterministic, alert or no alert ─────────────
+    # The warning case above is not the only one that matters. Asked "am I near a
+    # boundary?" from safe water, the model was handed a factual distance report and
+    # returned "You are inside India's EEZ. The EEZ boundary is 4.0 km away" — putting an
+    # acronym in front of a reader who has never seen one, over text that had deliberately
+    # said "India's own waters". The distances are facts and the vocabulary is a decision;
+    # neither is the model's to rewrite. It may translate.
+    geofence_summary = (state.get("geofence") or {}).get("summary")
+    if intent is Intent.GEOFENCE_CHECK and geofence_summary:
+        return await translate_only(geofence_summary, language_code)
 
     # ── The productivity narrative is deterministic too ───────────────────
     # It states a measured change and explicitly declines to claim causation. Handing it

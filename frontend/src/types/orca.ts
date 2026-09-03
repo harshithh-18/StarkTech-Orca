@@ -1,10 +1,16 @@
 /**
- * ORCA response contract — TypeScript mirror.
+ * ORCA wire contracts — TypeScript mirror.
  *
- * Owner: D · Status: 🔒 FROZEN after Day 3
+ * Owner: D
  *
- * MUST stay in sync with `backend/app/schemas/response.py`, which is the source of truth.
- * Changing either one means changing both plus docs/API_CONTRACT.md in the same PR.
+ * MUST stay in sync with the backend, which is the source of truth:
+ *   - `backend/app/schemas/response.py`   — the conversational turn (🔒 frozen)
+ *   - `backend/app/schemas/conditions.py` — the dashboard and watch contracts
+ *
+ * `backend/tests/test_schemas.py::test_enums_match_frontend_types` parses the unions in
+ * this file and fails the build if either side drifts, so this is enforced, not a
+ * convention. Changing an enum means editing three files in one commit: the Python enum,
+ * this file, and docs/API_CONTRACT.md.
  *
  * Import types from here — never redeclare a response shape inside a component.
  */
@@ -39,7 +45,8 @@ export type MapLayer =
   | "sst_heatmap"
   | "chlorophyll_heatmap"
   | "hazard_overlay"
-  | "route_line";
+  | "route_line"
+  | "ocean_fronts";
 
 /** ISO 639-1. Coastal languages first — ta/te/ml/bn are the demo targets. */
 export type Language =
@@ -54,7 +61,7 @@ export interface Location {
   lat: number;
   lon: number;
   name?: string | null;
-  /** "gps" | "geocoded" | "session_context" */
+  /** "gps" | "geocoded" | "session_context" | "picked" | … */
   source?: string | null;
 }
 
@@ -141,13 +148,163 @@ export interface ErrorDetail {
   hint?: string | null;
 }
 
+// ── Conditions dashboard ──────────────────────────────────────────────────
+
+/**
+ * `"none"` means the field has no safety threshold at all (tide, sea temperature).
+ * It is NOT the same as `"go"` — painting the tide green would claim it had been
+ * checked against a limit that does not exist. Render `none` neutrally.
+ */
+export type ConditionBand = "none" | "go" | "caution" | "no_go";
+
+export interface ConditionTile {
+  field: string;
+  label: string;
+  /** Icon key — see `components/common/Icon.tsx`. */
+  icon: string;
+  value: number;
+  unit?: string | null;
+  band: ConditionBand;
+  source: string;
+  time?: string | null;
+  /** Worst reading in the next 24 h — the number that changes a decision. */
+  peak_value?: number | null;
+  peak_time?: string | null;
+  /**
+   * Band of `peak_value`, separate from `band` on purpose: a reading can be inside the
+   * limits now and past them by evening, and one colour cannot say both.
+   */
+  peak_band: ConditionBand;
+  /** The caution limit, so a bar can be drawn against it. */
+  threshold?: number | null;
+}
+
+export interface TideSummary {
+  next_high_time?: string | null;
+  next_high_m?: number | null;
+  next_low_time?: string | null;
+  next_low_m?: number | null;
+  range_m?: number | null;
+  state: "rising" | "falling" | "unknown";
+  source: string;
+}
+
+/**
+ * Where the sea actually is, for a point that has none.
+ *
+ * Not an error payload — an answer. See `components/conditions/NoCoastCard.tsx`.
+ */
+export interface NearestCoast {
+  name: string;
+  state: string;
+  lat: number;
+  lon: number;
+  distance_km: number;
+  /** Spoken compass direction, e.g. "south-east". */
+  bearing: string;
+}
+
+export interface SafeWindow {
+  start: string;
+  end: string;
+  hours: number;
+  /** "clear" = every hour inside the limits; "workable" = some caution hours. */
+  quality: "clear" | "workable";
+}
+
+export interface ConditionsSnapshot {
+  location: Location;
+  observed_at: string;
+
+  tiles: ConditionTile[];
+  verdict: Verdict;
+  reasons: string[];
+  alerts: AlertType[];
+  tide?: TideSummary | null;
+
+  next_window?: SafeWindow | null;
+  windows: SafeWindow[];
+  blocked_by: string[];
+
+  charts: ChartSpec[];
+  evidence: Evidence[];
+
+  /**
+   * False when this point has no sea within range. Then there is no sea state, no tide
+   * and no safety verdict to give — not a degraded one, none.
+   */
+  coastal: boolean;
+  /** Populated whenever `coastal` is false — where to go instead. */
+  nearest_coast?: NearestCoast | null;
+
+  /** Which upstream models were unavailable, and why. */
+  degraded: string[];
+  used_mock_data: boolean;
+  attribution: string[];
+}
+
+/** One entry in the harbour list served by `GET /api/harbours`. */
+export interface Harbour {
+  name: string;
+  lat: number;
+  lon: number;
+  state: string;
+  coast: "east" | "west";
+}
+
+// ── Proactive watches ─────────────────────────────────────────────────────
+
+export interface WatchRequest {
+  session_id: string;
+  lat: number;
+  lon: number;
+  name?: string | null;
+  language?: Language;
+  interval_seconds?: number;
+}
+
+export interface WatchAlert {
+  type: AlertType;
+  severity: "info" | "warning" | "critical";
+  title: string;
+  detail: string;
+  raised_at: string;
+  location?: Location | null;
+  evidence: Evidence[];
+  /** Present on socket frames; absent when read back from the REST history. */
+  watch_id?: string;
+}
+
+export interface Watch {
+  id: string;
+  session_id: string;
+  location: Location;
+  language: Language;
+  interval_seconds: number;
+  created_at: string;
+  last_checked_at?: string | null;
+  active: boolean;
+}
+
+export interface WatchStatus {
+  watch: Watch;
+  verdict: Verdict;
+  alerts: WatchAlert[];
+  checks: number;
+}
+
+// ── Socket ────────────────────────────────────────────────────────────────
+
 /** A frame on WS /ws/trace/{session_id}. */
 export type TraceEvent =
   | { type: "trace"; session_id: string; payload: TraceStep }
   | { type: "answer"; session_id: string; payload: OrcaResponse }
+  | { type: "alert"; session_id: string; payload: WatchAlert }
   | { type: "error"; session_id: string; payload: ErrorDetail };
 
-/** A turn in the chat panel. Frontend-only — not part of the wire contract. */
+// ── Frontend-only ─────────────────────────────────────────────────────────
+
+/** A turn in the chat panel. Not part of the wire contract. */
 export interface ChatMessage {
   id: string;
   role: "user" | "orca";
@@ -158,4 +315,27 @@ export interface ChatMessage {
   failed?: boolean;
   /** The original query, so a failed turn can be re-sent without retyping it. */
   query?: string;
+}
+
+/**
+ * Who is asking. The problem statement names four stakeholder groups with genuinely
+ * different questions, and a fisherman should not have to scroll past "chlorophyll
+ * anomaly analysis" to find "is it safe today".
+ */
+export type Role = "fisherman" | "researcher" | "authority" | "operator";
+
+/** Persisted between visits, so the console opens where the user left it. */
+export interface Profile {
+  role: Role;
+  /**
+   * The reply language. Only sent to the backend when `autoLanguage` is false — the
+   * normal path is detection from what the user actually typed, which is what the
+   * problem statement asks for. This is the override.
+   */
+  language: Language;
+  /** True (the default) ⇒ detect the language from the query and reply in it. */
+  autoLanguage: boolean;
+  location: Location;
+  /** False until the welcome screen has been completed or skipped. */
+  onboarded: boolean;
 }

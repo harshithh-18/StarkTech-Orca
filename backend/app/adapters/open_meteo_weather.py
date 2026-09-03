@@ -64,8 +64,16 @@ SOURCE = "Open-Meteo"
 # Said in full wherever CAPE appears as evidence. The honesty note is not decoration —
 # a judge who knows meteorology will ask, and the right answer costs us nothing.
 LIGHTNING_PROXY_SOURCE = (
-    "Open-Meteo CAPE (modelled thunderstorm proxy, not an IMD lightning observation)"
+    "Open-Meteo storm energy — a modelled estimate of thunderstorm potential, "
+    "not an observed lightning report"
 )
+"""Written without the acronym on purpose.
+
+The honesty note is the point of this string and it is the *reader* who has to understand
+it. "Open-Meteo CAPE (modelled thunderstorm proxy, not an IMD lightning observation)"
+carries two acronyms and a term of art into a sentence a fisherman reads at 4 a.m.; it
+communicated the caveat to meteorologists and to nobody else. The underlying field is still
+CAPE, and ``docs/DATA_SOURCES.md`` says so for whoever needs that."""
 
 UNITS = {
     "wind_speed_10m": "km/h",

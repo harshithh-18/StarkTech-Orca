@@ -109,8 +109,8 @@ streaming. This is essentially the final demo; P3 only makes it survivable.
       the documented upgrade. — **F**
 - [x] **Route optimisation** (golden query #5) — A* over a forecast wave grid, costed at
       estimated time of arrival, land impassable. — **E**
-- [ ] CV front/eddy detection — **F**
-- [ ] Proactive alerts
+- [x] **CV front/eddy detection** — delivered in P4, see below — **F**
+- [x] **Proactive alerts** — delivered in P4, see below
 
 **Demo at end of P3:** the whole thing, from a cold laptop, with the Wi-Fi turned off.
 
@@ -122,6 +122,66 @@ streaming. This is essentially the final demo; P3 only makes it survivable.
 - [ ] Rehearse the failure path: what you say when a query returns partial data
 - [ ] Fix demo-breakers **only** — no new features, no refactors, no "quick improvements"
 - [ ] Submit
+
+---
+
+## P4 — Operational depth · Sep 3
+
+**Goal:** close the gap between "answers five questions" and "is a platform someone would
+open in the morning". Everything here is additive; nothing in P0–P3 was renegotiated, and
+the frozen response contract was not touched.
+
+### The platform speaks first
+
+- [x] **Conditions dashboard** — `GET /api/conditions` returns the live now-cast for a
+      point: eight readings against their limits, the verdict, the tide, the forecast
+      curves. No question required. — **B**
+- [x] **Next safe departure window** — `services/safe_window.py` scores every hour of the
+      forecast with the *same* `risk_rules.breaches` the verdict uses, groups the safe
+      runs, and answers "then when?" — the question a NO_GO always provokes. — **E**
+- [x] **Proactive watches** — `POST /api/watch` registers a standing watch; the backend
+      re-checks conditions and boundary distance on a timer and pushes anything that
+      turned worse down the existing trace socket. Announces changes, never repeats
+      itself, never announces good news. — **B + E**
+
+### New data
+
+- [x] **Tides** — `sea_level_height_msl` from the marine model, rides on the request we
+      already make. Curve + next high/low. Closes the problem statement's "tide, weather
+      and sea conditions" query. — **B**
+- [x] **Thermal front / eddy detection** — `services/fronts.py`. Gradient magnitude of a
+      smoothed SST field, thresholded at the operational front definition, connected
+      components, shape heuristic for eddy-like features. Feeds the fishing-zone and
+      productivity answers, so "there is a zone 38 km north-east" becomes "…on the edge of
+      a 200 km temperature front". — **E**
+- [x] **Cyclone classification** — `adapters/imd_bulletins.py`, the P2 TODO resolved. IMD
+      publishes no machine-readable bulletin (all four documented URLs 404, verified), so
+      modelled pressure and sustained wind are classified against IMD's own wind bands and
+      labelled a proxy everywhere they surface. — **B**
+- [x] **wave_heatmap and hazard_overlay** now return real data. Both were selected by the
+      visualization agent and served an empty collection — a layer switched on for every
+      safety answer that drew nothing. — **B**
+
+### The interface
+
+- [x] **Rebuilt as a console, not a page.** Five named destinations — Ask, Conditions,
+      Alerts, Layers, Sources — with the map always beside them. — **D**
+- [x] **First-run setup**: what ORCA is, who it is for, and the three settings that make
+      the first answer a good one (role, harbour, language). — **D**
+- [x] Role-aware starters: a fisher, a coastal authority, a researcher and an operator ask
+      different questions of the same data. — **D**
+- [x] One SVG icon system replacing emoji chrome; a three-level surface system; shared
+      formatters so no two panels describe the same window differently. — **D**
+- [x] Map: real dark treatment per basemap, place labels, click-to-repoint, live legend,
+      coordinate readout, `ResizeObserver` re-measure. — **D**
+- [x] An error boundary around the map, after a hidden-container `flyTo` crash was found to
+      blank the entire application on every screen narrower than 768px. — **D**
+
+### Tests
+
+211 passing, up from 144. New suites for the departure window, the conditions snapshot,
+front detection, watches and the cyclone proxy — each pinning the property that would be
+dangerous to get wrong rather than the shape of the output.
 
 ---
 

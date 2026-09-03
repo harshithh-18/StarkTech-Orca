@@ -29,13 +29,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.adapters.base import (
     AdapterError,
+    LocationNotAtSea,
     fetch_with_cascade,
     get_json,
     has_any_values,
+    parse_hour,
     peak_in_window,
     slice_window,
 )
@@ -57,7 +59,25 @@ HOURLY_FIELDS = [
     "sea_surface_temperature",
     "ocean_current_velocity",
     "ocean_current_direction",
+    "sea_level_height_msl",
 ]
+
+# Fields that must NOT be reduced to a "worst" reading.
+#
+#   - directions are circular: 350° is not worse than 10°, and they are 20° apart
+#   - tide height is a sinusoid, not a hazard scale: its maximum is high water, which is
+#     usually the *safest* moment to cross a harbour bar. It is reported as a curve and as
+#     the next turning point instead — see ``get_tide_series``.
+NON_PEAK_FIELDS = {
+    "wave_direction",
+    "ocean_current_direction",
+    "sea_level_height_msl",
+}
+
+# The tidal signal. Open-Meteo publishes it as height above mean sea level, which is the
+# tide curve for our purposes: we care about the shape (when it turns) and the range, not
+# about an absolute chart datum.
+TIDE_FIELD = "sea_level_height_msl"
 
 # How far offshore to look for the fishing ground, and how many bearings to try.
 # Eight bearings at 25 km costs one HTTP request (the API takes comma-separated
@@ -79,6 +99,7 @@ UNITS = {
     "sea_surface_temperature": "°C",
     "ocean_current_velocity": "km/h",
     "ocean_current_direction": "°",
+    "sea_level_height_msl": "m",
 }
 
 
@@ -188,9 +209,10 @@ async def get_sea_state_evidence(
 
     cells = await fetch_area(lat, lon)
     if not cells:
-        raise AdapterError(
-            f"no sea within {SAMPLE_RADIUS_KM:.0f} km of this location — it appears to "
-            f"be inland"
+        # Its own exception type, not a generic AdapterError: "there is no sea here" and
+        # "the sea model is down" need completely different things said about them.
+        raise LocationNotAtSea(
+            f"there is no sea within {SAMPLE_RADIUS_KM:.0f} km of this location"
         )
 
     # For each field, keep the worst reading found anywhere in the sampled area.
@@ -201,10 +223,9 @@ async def get_sea_state_evidence(
         if not indices:
             continue
         for field in HOURLY_FIELDS:
-            # Directions are circular — a "maximum bearing" is meaningless, so they ride
-            # along with the peak reading of the field they describe rather than being
-            # maximised on their own.
-            if field.endswith("_direction"):
+            # Directions ride along with the field they describe; tide height is a curve,
+            # not a hazard scale. See NON_PEAK_FIELDS.
+            if field in NON_PEAK_FIELDS:
                 continue
             found = peak_in_window(hourly, field, indices, mode="max")
             if found is None:
@@ -237,6 +258,141 @@ async def get_sea_state_evidence(
             )
         )
     return evidence
+
+
+async def get_tide_series(lat: float, lon: float, hours: int = 48) -> dict:
+    """The tide curve at the nearest sea cell, plus its turning points.
+
+    Returns ``{"times": [...], "heights": [...], "turns": [{"kind", "time", "height"}]}``
+    where ``kind`` is ``"high"`` or ``"low"``.
+
+    Turning points are found by sign change in the hourly difference rather than by
+    harmonic analysis: at hourly resolution that lands within ~30 minutes of the true
+    slack, which is the honest precision to claim from a 1-hour series. A boat crossing a
+    harbour bar needs "high water is around 06:00", not a second-accurate prediction.
+    """
+    cells = await fetch_area(lat, lon, forecast_days=max(2, (hours // 24) + 1))
+    if not cells:
+        raise LocationNotAtSea(
+            f"there is no sea within {SAMPLE_RADIUS_KM:.0f} km of this location"
+        )
+
+    # The cell nearest the requested point: the tide at the harbour is what matters, and
+    # a cell 25 km offshore can be half an hour out of phase.
+    def distance_sq(cell: dict) -> float:
+        return (cell.get("latitude", lat) - lat) ** 2 + (cell.get("longitude", lon) - lon) ** 2
+
+    nearest = min(cells, key=distance_sq)
+    hourly = nearest.get("hourly") or {}
+    times = (hourly.get("time") or [])[:hours]
+    heights = (hourly.get(TIDE_FIELD) or [])[:hours]
+
+    if not any(h is not None for h in heights):
+        raise AdapterError("the marine model returned no tide heights for this cell")
+
+    turns: list[dict] = []
+    for i in range(1, len(heights) - 1):
+        previous, current, following = heights[i - 1], heights[i], heights[i + 1]
+        if previous is None or current is None or following is None:
+            continue
+        if current >= previous and current >= following and current > min(previous, following):
+            turns.append({"kind": "high", "time": times[i], "height": round(current, 2)})
+        elif current <= previous and current <= following and current < max(previous, following):
+            turns.append({"kind": "low", "time": times[i], "height": round(current, 2)})
+
+    return {
+        "times": times,
+        "heights": heights,
+        "turns": turns,
+        "location": Location(
+            lat=nearest.get("latitude", lat),
+            lon=nearest.get("longitude", lon),
+            source="marine_grid_sample",
+        ),
+    }
+
+
+# Wave-field grid for the map heatmap. 9×9 = 81 points is still ONE request (Open-Meteo
+# takes comma-separated coordinates) and renders as a readable field at basin zoom. 7×7
+# was too sparse once land cells were dropped — a coastal box loses roughly half its
+# points to land, and two dozen dots read as scattered noise rather than a field.
+GRID_STEPS = 9
+
+
+async def fetch_wave_grid(
+    lat: float, lon: float, radius_km: float = 150.0, at: datetime | None = None
+) -> list[dict]:
+    """A square grid of wave heights around a point, for the wave heatmap layer.
+
+    Returns ``[{"lat", "lon", "value", "time"}]`` for sea cells only — land cells come
+    back as all-nulls from the API and are dropped, so the heatmap stops at the coastline
+    instead of painting the Deccan plateau.
+    """
+    d_lat = radius_km / 111.32
+    d_lon = radius_km / (111.32 * max(math.cos(math.radians(lat)), 1e-6))
+
+    points: list[tuple[float, float]] = []
+    for row in range(GRID_STEPS):
+        for col in range(GRID_STEPS):
+            fraction_y = row / (GRID_STEPS - 1) * 2 - 1
+            fraction_x = col / (GRID_STEPS - 1) * 2 - 1
+            points.append((lat + fraction_y * d_lat, lon + fraction_x * d_lon))
+
+    params = {
+        "latitude": ",".join(f"{p[0]:.3f}" for p in points),
+        "longitude": ",".join(f"{p[1]:.3f}" for p in points),
+        "hourly": "wave_height",
+        "forecast_days": 2,
+        "timezone": "UTC",
+    }
+    key = cache_key("open_meteo_marine_grid", params)
+    result = await fetch_with_cascade(
+        key, lambda: get_json(BASE_URL, params), CACHE_TTL, SOURCE
+    )
+
+    payload = result.payload
+    cells = payload if isinstance(payload, list) else [payload]
+
+    target = at or datetime.now(timezone.utc)
+    grid: list[dict] = []
+    seen: set[tuple[float, float]] = set()
+    for cell in cells:
+        hourly = cell.get("hourly") or {}
+        if not has_any_values(hourly, "wave_height"):
+            continue  # land
+
+        snapped = (round(cell.get("latitude", 0), 3), round(cell.get("longitude", 0), 3))
+        if snapped in seen:
+            continue
+        seen.add(snapped)
+
+        # The hour nearest the requested time, so "wave field tomorrow morning" shows
+        # tomorrow morning rather than whatever happened to be first in the array.
+        times = hourly.get("time") or []
+        values = hourly.get("wave_height") or []
+        best_index, best_gap = None, None
+        for i, stamp in enumerate(times):
+            if i >= len(values) or values[i] is None:
+                continue
+            try:
+                gap = abs((parse_hour(stamp) - target).total_seconds())
+            except (ValueError, AttributeError):
+                continue
+            if best_gap is None or gap < best_gap:
+                best_index, best_gap = i, gap
+
+        if best_index is None:
+            continue
+        grid.append(
+            {
+                "lat": snapped[0],
+                "lon": snapped[1],
+                "value": round(float(values[best_index]), 2),
+                "time": times[best_index],
+            }
+        )
+
+    return grid
 
 
 async def _spike() -> None:

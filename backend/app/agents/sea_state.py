@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 
 from app.adapters import open_meteo_marine
+from app.adapters.base import parse_hour
 from app.schemas.enums import ChartKind
 from app.schemas.response import ChartPoint, ChartSeries, ChartSpec, Evidence, Location
 
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 
 NAME = "sea_state"
 ATTRIBUTION = open_meteo_marine.ATTRIBUTION
+
+# Named in full wherever a tide value is cited. Modelled, not a port tide table — the
+# distinction matters to anyone who has actually used one.
+TIDE_SOURCE = "Open-Meteo Marine (modelled sea level, not a port tide table)"
 
 
 async def fetch_sea_state(location: Location, time_window: dict) -> list[Evidence]:
@@ -77,12 +82,63 @@ async def fetch_forecast_chart(location: Location, hours: int = 48) -> ChartSpec
     )
 
 
-async def fetch_tides(location: Location) -> ChartSpec:
-    """Tide curve.
+async def fetch_tides(location: Location, hours: int = 48) -> tuple[ChartSpec, list[Evidence]]:
+    """Tide curve plus the next high and low water.
 
-    TODO(P3, B): Open-Meteo Marine doesn't publish tides directly — decide between a
-                 harmonic model and an INCOIS tide table, and note the choice in
-                 docs/DATA_SOURCES.md. Cut this if P3 is tight; it's the least load-bearing
-                 chart on the screen.
+    Source decision (recorded in docs/DATA_SOURCES.md): Open-Meteo Marine publishes
+    ``sea_level_height_msl``, the modelled sea-surface height above mean sea level. That is
+    the tidal signal, and it comes from the same request we already make for waves — so it
+    costs nothing extra and stays consistent with the rest of the sea state.
+
+    It is a **model**, not an INCOIS tide table for a specific port, and the evidence
+    source string says so. For "should I cross the bar around dawn?" the modelled curve is
+    the right precision; for a port's official chart datum it is not, and we do not claim
+    to be one.
     """
-    raise NotImplementedError("TODO(P3, B)")
+    series = await open_meteo_marine.get_tide_series(location.lat, location.lon, hours)
+
+    points = [
+        ChartPoint(x=t, y=float(h) if h is not None else None)
+        for t, h in zip(series["times"], series["heights"])
+    ]
+
+    chart = ChartSpec(
+        id="tide",
+        title="Tide, next 48 hours",
+        kind=ChartKind.AREA,
+        x_label="Time (UTC)",
+        y_label="Height above mean sea level (m)",
+        series=[ChartSeries(name="Tide", unit="m", points=points)],
+    )
+
+    # Only the next turning point of each kind: a list of eight is a table, and what the
+    # user is actually asking is "when is the next high water".
+    evidence: list[Evidence] = []
+    for kind in ("high", "low"):
+        turn = next((t for t in series["turns"] if t["kind"] == kind), None)
+        if turn is None:
+            continue
+        evidence.append(
+            Evidence(
+                field=f"next_{kind}_tide",
+                value=turn["height"],
+                unit="m",
+                source=TIDE_SOURCE,
+                time=parse_hour(turn["time"]),
+                location=series["location"],
+            )
+        )
+
+    heights = [h for h in series["heights"] if h is not None]
+    if heights:
+        evidence.append(
+            Evidence(
+                field="tidal_range",
+                value=round(max(heights) - min(heights), 2),
+                unit="m",
+                source=TIDE_SOURCE,
+                location=series["location"],
+            )
+        )
+
+    return chart, evidence

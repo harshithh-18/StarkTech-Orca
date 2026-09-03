@@ -42,8 +42,12 @@ export default {
         },
 
         // ── Abyss: dark-mode surfaces, blue-tinted rather than flat grey ───
+        // Four steps, matching the surface levels in styles/index.css. A flat grey dark
+        // mode reads as "the light theme with the lights off"; the blue tint keeps it
+        // recognisably the same product.
         abyss: {
           50: "#f8fafc",
+          700: "#1a2942",
           800: "#111c30",
           850: "#0d1626",
           900: "#0a111e",

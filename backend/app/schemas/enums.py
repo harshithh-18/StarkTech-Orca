@@ -55,6 +55,7 @@ class MapLayer(str, Enum):
     CHLOROPHYLL_HEATMAP = "chlorophyll_heatmap"
     HAZARD_OVERLAY = "hazard_overlay"
     ROUTE_LINE = "route_line"
+    OCEAN_FRONTS = "ocean_fronts"                # detected thermal fronts / eddy-like features
 
 
 class Language(str, Enum):

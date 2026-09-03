@@ -23,6 +23,20 @@
 | `POST` | `/api/query` | `QueryRequest` → `OrcaResponse` | B |
 | `GET` | `/api/layers/{layer}` | → GeoJSON `FeatureCollection` | B |
 | `WS` | `/ws/trace/{session_id}` | → stream of `TraceEvent` | B + D |
+| `GET` | `/api/conditions` | `?lat&lon&name` → `ConditionsSnapshot` | B |
+| `POST` | `/api/watch` | `WatchRequest` → `WatchStatus` | B |
+| `GET` | `/api/watch` | `?session_id` → `WatchStatus[]` | B |
+| `GET` | `/api/watch/{id}` | → `WatchStatus` | B |
+| `DELETE` | `/api/watch/{id}` | → `{"cancelled": bool}` | B |
+
+The last five are **P4 additions and are not part of the frozen contract.** They describe
+the two paths that do not start with a question — the live dashboard and the proactive
+watch — and they live in their own schema file so `response.py` stays untouched:
+
+| Where | File |
+|-------|------|
+| Python | [`backend/app/schemas/conditions.py`](../backend/app/schemas/conditions.py) |
+| TypeScript | [`frontend/src/types/orca.ts`](../frontend/src/types/orca.ts) |
 
 ---
 
@@ -160,7 +174,7 @@ AlertType   CYCLONE | HIGH_WAVE | HIGH_WIND | LIGHTNING | GEOFENCE_BREACH |
 
 MapLayer    user_pin | pfz_zones | eez_boundary | imbl_line | mpa_zones |
             wave_heatmap | sst_heatmap | chlorophyll_heatmap |
-            hazard_overlay | route_line
+            hazard_overlay | route_line | ocean_fronts
 
 Language    en | hi | ta | te | ml | bn | kn | mr | gu | or
             (the coastal languages first — ta/te/ml/bn are the demo targets)
@@ -177,9 +191,16 @@ rather than after the fact.
 ```json
 {"type": "trace",  "session_id": "3f9c...", "payload": { /* TraceStep */ }}
 {"type": "answer", "session_id": "3f9c...", "payload": { /* OrcaResponse */ }}
+{"type": "alert",  "session_id": "3f9c...", "payload": { /* WatchAlert + watch_id */ }}
 {"type": "error",  "session_id": "3f9c...", "payload": {"code": "ADAPTER_TIMEOUT",
                                                         "message": "..."}}
 ```
+
+`type: "alert"` (P4) carries a proactive watch alert. It shares this socket deliberately:
+the client already holds it open for the reasoning panel, and a push channel that needs its
+own connection is one that quietly dies behind an idle-timeout proxy — which, in a safety
+feature, is the failure mode you find out about afterwards. Alerts are also readable from
+`GET /api/watch/{id}`, so a client that was reconnecting when one fired can recover it.
 
 The final `OrcaResponse` arrives **both** on the WebSocket (`type: "answer"`) and as the
 `POST /api/query` response body. The frontend may use either; the POST body is the
@@ -204,6 +225,9 @@ Standard HTTP codes with a consistent body:
 | `ADAPTER_TIMEOUT` | 504 | Upstream data source didn't answer — retry or fall back to mock |
 | `ADAPTER_UNAVAILABLE` | 503 | Source down and no cache entry exists |
 | `LLM_UNAVAILABLE` | 503 | Gemini and Groq both failed |
+| `CONDITIONS_UNAVAILABLE` | 503 | No forecast model answered for this point (often: it is inland) |
+| `WATCH_UNAVAILABLE` | 503 | A watch could not be started here |
+| `WATCH_NOT_FOUND` | 404 | No such watch — they are in-memory and do not survive a restart |
 
 **Degradation rule:** a missing data source must **never** produce a 500. Drop the affected
 evidence, add a `skipped` trace step saying which agent couldn't run and why, and answer

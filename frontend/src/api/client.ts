@@ -7,7 +7,16 @@
  * build needs no environment-specific configuration.
  */
 
-import type { ErrorDetail, MapLayer, OrcaResponse, QueryRequest } from "@/types/orca";
+import type {
+  ConditionsSnapshot,
+  ErrorDetail,
+  Harbour,
+  MapLayer,
+  OrcaResponse,
+  QueryRequest,
+  WatchRequest,
+  WatchStatus,
+} from "@/types/orca";
 
 /**
  * Where the backend lives.
@@ -132,6 +141,67 @@ export async function getLayerCached(
   const collection = await getLayer(layer, opts);
   if (layer !== "route_line") layerCache.set(key, collection);
   return collection;
+}
+
+/**
+ * GET /api/conditions — the live now-cast for a point.
+ *
+ * Deliberately not cached: this is the one call whose whole value is being current, and a
+ * dashboard showing a cached sea state is exactly the failure the cache is meant to
+ * prevent elsewhere. The backend caches upstream for an hour, which is where caching
+ * belongs.
+ */
+export async function getConditions(
+  lat: number,
+  lon: number,
+  name?: string | null,
+  signal?: AbortSignal,
+): Promise<ConditionsSnapshot> {
+  const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+  if (name) params.set("name", name);
+
+  const response = await fetch(`${API_BASE}/api/conditions?${params}`, { signal });
+  if (!response.ok) throw await parseError(response);
+  return (await response.json()) as ConditionsSnapshot;
+}
+
+/** POST /api/watch — start a proactive safety watch on a location. */
+export async function createWatch(request: WatchRequest): Promise<WatchStatus> {
+  const response = await fetch(`${API_BASE}/api/watch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) throw await parseError(response);
+  return (await response.json()) as WatchStatus;
+}
+
+/** GET /api/watch?session_id= — this session's active watches and their history. */
+export async function listWatches(sessionId: string): Promise<WatchStatus[]> {
+  const response = await fetch(
+    `${API_BASE}/api/watch?session_id=${encodeURIComponent(sessionId)}`,
+  );
+  if (!response.ok) throw await parseError(response);
+  return (await response.json()) as WatchStatus[];
+}
+
+/** DELETE /api/watch/{id} — stop a watch. Idempotent. */
+export async function cancelWatch(watchId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/watch/${watchId}`, { method: "DELETE" });
+  if (!response.ok) throw await parseError(response);
+}
+
+/**
+ * GET /api/harbours — the harbour list the picker is built from.
+ *
+ * Fetched rather than hard-coded so there is one list, not two: the same coordinates
+ * answer "where can I ask about?" here and "where is the nearest coast?" when the backend
+ * has to tell someone inland where the sea is.
+ */
+export async function getHarbours(): Promise<Harbour[]> {
+  const response = await fetch(`${API_BASE}/api/harbours`);
+  if (!response.ok) throw await parseError(response);
+  return (await response.json()) as Harbour[];
 }
 
 /** GET /health */

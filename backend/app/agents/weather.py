@@ -36,20 +36,17 @@ async def fetch_weather(location: Location, time_window: dict) -> list[Evidence]
 
 
 async def check_cyclone_alerts(location: Location) -> list[Evidence]:
-    """IMD / RSMC cyclone and severe-weather bulletins near the location.
+    """Tropical-system check near the location.
 
-    Absence of a bulletin is NOT evidence of safety, so this returns an explicit
-    "no active bulletin" Evidence rather than an empty list — the trace should show that
-    the check actually ran.
+    Absence of a warning is NOT evidence of safety, so this always returns evidence —
+    including an explicit ``cyclone_bulletin_active=False`` — rather than an empty list.
+    The trace must be able to show that the check ran and found nothing, which reads
+    completely differently from the check never running.
 
-    TODO(P2, B): parse the IMD bulletin page via adapters.imd_bulletins and filter by
-                 proximity. Until then this reports honestly that the check is not wired,
-                 rather than reporting "all clear" on no information at all.
+    IMD publishes no machine-readable bulletin endpoint (every documented URL 404s; see
+    ``adapters.imd_bulletins``), so this is a **declared proxy**: modelled pressure and
+    wind classified against IMD's own bands, labelled as such in every evidence source.
     """
     from app.adapters import imd_bulletins
 
-    try:
-        return await imd_bulletins.get_alerts_near(location.lat, location.lon)
-    except NotImplementedError:
-        logger.info("weather: IMD bulletin parsing is not implemented (P2) — skipping")
-        return []
+    return await imd_bulletins.get_alerts_near(location.lat, location.lon)

@@ -178,8 +178,134 @@ async def get_layer(
                 ).model_dump(),
             ) from exc
 
-    # ── Not built ─────────────────────────────────────────────────────────
-    # TODO(P3, B): wave_heatmap needs a gridded Open-Meteo sweep; route_line and
-    #              hazard_overlay are drawn client-side from the response.
-    logger.info("layers: %s is not implemented yet — returning an empty collection", layer.value)
+    # ── Wave field ────────────────────────────────────────────────────────
+    if layer is MapLayer.WAVE_HEATMAP:
+        if lat is None or lon is None:
+            raise HTTPException(
+                status_code=422,
+                detail=ErrorResponse(
+                    error=ErrorDetail(
+                        code="LOCATION_UNRESOLVED",
+                        message="wave_heatmap needs lat and lon.",
+                        hint="Call /api/layers/wave_heatmap?lat=16.99&lon=82.24",
+                    )
+                ).model_dump(),
+            )
+
+        from app.adapters import open_meteo_marine
+
+        try:
+            # Capped at 300 km: past that the grid spacing is coarser than the wave field
+            # it is meant to show, and a 7×7 grid over half the Bay is decoration.
+            grid = await open_meteo_marine.fetch_wave_grid(
+                lat, lon, radius_km=min(radius_km, 300.0)
+            )
+        except Exception as exc:  # noqa: BLE001 - a layer must never 500
+            logger.info("layers: wave grid unavailable (%s)", exc)
+            return EMPTY
+
+        if not grid:
+            return EMPTY
+
+        values = [cell["value"] for cell in grid]
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [cell["lon"], cell["lat"]]},
+                    "properties": {
+                        "value": cell["value"],
+                        "field": "wave_height",
+                        "time": cell["time"],
+                    },
+                }
+                for cell in grid
+            ],
+            "properties": {
+                "field": "wave_height",
+                "unit": "m",
+                "source": open_meteo_marine.ATTRIBUTION,
+                "min": min(values),
+                "max": max(values),
+            },
+        }
+
+    # ── Detected thermal fronts ───────────────────────────────────────────
+    if layer is MapLayer.OCEAN_FRONTS:
+        from app.services import fronts
+
+        box = _bbox_around(lat, lon, radius_km)
+        bbox_dict = (
+            {"lon_min": box[0], "lat_min": box[1], "lon_max": box[2], "lat_max": box[3]}
+            if box
+            else None
+        )
+        try:
+            # Synchronous NumPy over a local NetCDF grid; off the event loop so a large
+            # subset cannot stall every other request in flight.
+            import anyio
+
+            return await anyio.to_thread.run_sync(lambda: fronts.detect(bbox_dict))
+        except Exception as exc:
+            logger.info("layers: front detection unavailable (%s)", exc)
+            raise HTTPException(
+                status_code=503,
+                detail=ErrorResponse(
+                    error=ErrorDetail(
+                        code="ADAPTER_UNAVAILABLE",
+                        message=f"Could not detect thermal fronts: {exc}",
+                        hint="Run `python scripts/fetch_copernicus_subset.py` to download "
+                        "the SST subset this layer is computed from.",
+                    )
+                ).model_dump(),
+            ) from exc
+
+    # ── Hazard overlay ────────────────────────────────────────────────────
+    # Drawn from the live conditions at the point, not from the answer: the answer's
+    # alerts say *that* there is a hazard, this says *where* it is bad enough to matter.
+    if layer is MapLayer.HAZARD_OVERLAY:
+        if lat is None or lon is None:
+            return EMPTY
+
+        from app.adapters import open_meteo_marine
+        from app.services.risk_rules import THRESHOLDS
+
+        try:
+            grid = await open_meteo_marine.fetch_wave_grid(
+                lat, lon, radius_km=min(radius_km, 300.0)
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.info("layers: hazard overlay unavailable (%s)", exc)
+            return EMPTY
+
+        limit = THRESHOLDS["wave_height"]["no_go"]
+        hazardous = [cell for cell in grid if cell["value"] >= limit]
+        return {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [cell["lon"], cell["lat"]]},
+                    "properties": {
+                        "value": cell["value"],
+                        "unit": "m",
+                        "hazard": "wave_height_above_small_craft_limit",
+                        "threshold": limit,
+                        "time": cell["time"],
+                        "source": open_meteo_marine.ATTRIBUTION,
+                    },
+                }
+                for cell in hazardous
+            ],
+            "properties": {
+                "field": "wave_height",
+                "unit": "m",
+                "threshold": limit,
+                "source": open_meteo_marine.ATTRIBUTION,
+            },
+        }
+
+    # ── The user's pin is client-side; nothing else is left ───────────────
+    logger.info("layers: %s has no server-side data — returning an empty collection", layer.value)
     return EMPTY

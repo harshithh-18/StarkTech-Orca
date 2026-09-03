@@ -1,57 +1,51 @@
 /**
  * Live reasoning-trace hook.
  *
- * Owner: D · Phase: P2
+ * Owner: D · Phase: P2 · Rewired P4 onto the shared socket
  *
- * Subscribes to the trace WebSocket and accumulates steps for the panel. Steps arrive out
- * of order when specialists run in parallel — sort by `seq`, never by arrival.
+ * Accumulates trace steps for the panel. Steps arrive out of order when specialists run in
+ * parallel — sort by `seq`, never by arrival.
+ *
+ * The socket itself is owned by `useOrcaSocket`; this hook only subscribes. See that
+ * file for why there can be only one connection per session.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { connectTraceSocket, type TraceSocket } from "@/api/socket";
-import type { OrcaResponse, TraceEvent, TraceStep } from "@/types/orca";
+import type { TraceListener } from "@/hooks/useOrcaSocket";
+import type { OrcaResponse, TraceStep } from "@/types/orca";
 
 export interface UseReasoningTrace {
   steps: TraceStep[];
   streaming: boolean;
-  connected: boolean;
   clear(): void;
   /** Replace the live steps with the authoritative trace from the POST response. */
   settle(response: OrcaResponse): void;
   begin(): void;
 }
 
-export function useReasoningTrace(sessionId: string): UseReasoningTrace {
+export function useReasoningTrace(
+  subscribe: (listener: TraceListener) => () => void,
+): UseReasoningTrace {
   const [steps, setSteps] = useState<TraceStep[]>([]);
-  const [connected, setConnected] = useState(false);
   const [streaming, setStreaming] = useState(false);
-  const socketRef = useRef<TraceSocket | null>(null);
 
-  const handleEvent = useCallback((event: TraceEvent) => {
-    if (event.type !== "trace") return;
+  useEffect(
+    () =>
+      subscribe((event) => {
+        if (event.type !== "trace") return;
 
-    setSteps((current) => {
-      const step = event.payload;
-      // A node emits `started` then `ok` for the same work. Key by agent+seq so both are
-      // kept, but replace an exact seq match rather than duplicating on a reconnect.
-      const next = current.filter((s) => s.seq !== step.seq);
-      next.push(step);
-      return next.sort((a, b) => a.seq - b.seq);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const socket = connectTraceSocket(sessionId, handleEvent, setConnected);
-    socketRef.current = socket;
-
-    return () => {
-      socket.close();
-      socketRef.current = null;
-    };
-  }, [sessionId, handleEvent]);
+        setSteps((current) => {
+          const step = event.payload;
+          // A node emits `started` then `ok` for the same work. Replace an exact seq
+          // match rather than duplicating it on a reconnect.
+          const next = current.filter((s) => s.seq !== step.seq);
+          next.push(step);
+          return next.sort((a, b) => a.seq - b.seq);
+        });
+      }),
+    [subscribe],
+  );
 
   const clear = useCallback(() => setSteps([]), []);
 
@@ -71,5 +65,5 @@ export function useReasoningTrace(sessionId: string): UseReasoningTrace {
     }
   }, []);
 
-  return { steps, streaming, connected, clear, settle, begin };
+  return { steps, streaming, clear, settle, begin };
 }

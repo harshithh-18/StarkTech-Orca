@@ -1,69 +1,75 @@
 /**
- * Conversation state hook.
+ * Conversation state.
  *
- * Owner: D · Phase: P1
+ * Owner: D · Phase: P1 · Rewired P4
  *
- * Owns the message list, the session id, and the in-flight request. One session id lives
- * for the whole conversation — that's what makes "…and is it safe there?" resolve against
- * the previous turn.
+ * Owns the message list and the in-flight request. The session id is **passed in**, not
+ * created here: it keys the LangGraph checkpointer (so "…and is it safe there?" resolves
+ * against the previous turn) *and* addresses the trace socket, so exactly one owner —
+ * `App` — has to decide when it changes. A hook that minted its own would leave the
+ * socket subscribed to a session nobody publishes to.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { newSessionId, OrcaApiError, postQuery } from "@/api/client";
-import type { ChatMessage, OrcaResponse } from "@/types/orca";
+import { OrcaApiError, postQuery } from "@/api/client";
+import type { ChatMessage, Language, Location, OrcaResponse } from "@/types/orca";
 
 export interface UseOrcaQuery {
   messages: ChatMessage[];
   latest: OrcaResponse | null;
-  sessionId: string;
   loading: boolean;
   error: string | null;
-  coords: { lat: number; lon: number } | null;
+  /** The device's own position, once granted. Null when refused or unavailable. */
+  gps: Location | null;
   ask(query: string): Promise<void>;
   retry(messageId: string): Promise<void>;
   reset(): void;
+  dismissError(): void;
 }
 
 export interface UseOrcaQueryOptions {
-  /** Session id to use. Must be the SAME id the trace socket subscribed to, or the live
-   *  trace panel silently listens to a session nobody is publishing to. */
-  sessionId?: string;
-  /** Where to ask about. Explicit rather than implicit device GPS: anyone testing indoors
-   *  is inland, where there is no marine forecast and every query correctly returns
-   *  nothing. See components/LocationPicker.tsx. */
-  location?: { lat: number; lon: number } | null;
+  /** MUST be the same id the trace socket subscribed to. */
+  sessionId: string;
+  /**
+   * The point every query is about. Explicit rather than implicit device GPS: anyone
+   * testing indoors is inland, where there is no marine forecast and every query
+   * correctly returns nothing — which looks like a broken app.
+   */
+  location: Location | null;
+  /** Forces the reply language. Null (the default) ⇒ detect it from the query. */
+  language?: Language | null;
   onResponse?: (response: OrcaResponse) => void;
   onAskStart?: () => void;
 }
 
-export function useOrcaQuery(options: UseOrcaQueryOptions = {}): UseOrcaQuery {
-  const { sessionId: providedSessionId, location, onResponse, onAskStart } = options;
-  const [sessionId, setSessionId] = useState(() => providedSessionId ?? newSessionId());
+export function useOrcaQuery(options: UseOrcaQueryOptions): UseOrcaQuery {
+  const { sessionId, location, language, onResponse, onAskStart } = options;
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [latest, setLatest] = useState<OrcaResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [gps, setGps] = useState<Location | null>(null);
 
-  // Kept in a ref so `ask` doesn't need to be rebuilt when the position or the picked
-  // location changes.
-  const coordsRef = useRef<{ lat: number; lon: number } | null>(null);
-  const locationRef = useRef<{ lat: number; lon: number } | null>(null);
-  locationRef.current = location ?? null;
+  // Held in refs so `ask` keeps a stable identity as the location or language changes —
+  // otherwise every consumer that depends on it rebuilds on each pan of the map.
+  const locationRef = useRef<Location | null>(null);
+  const languageRef = useRef<Language | null>(null);
+  locationRef.current = location;
+  languageRef.current = language ?? null;
 
   useEffect(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const next = {
+      (position) =>
+        setGps({
           lat: position.coords.latitude,
           lon: position.coords.longitude,
-        };
-        coordsRef.current = next;
-        setCoords(next);
-      },
-      // Denied or unavailable is fine — the backend falls back to geocoding the query.
+          name: "My location",
+          source: "gps",
+        }),
+      // Denied or unavailable is fine — the harbour picker is the primary path.
       () => undefined,
       { timeout: 5000, maximumAge: 300_000 },
     );
@@ -79,10 +85,9 @@ export function useOrcaQuery(options: UseOrcaQueryOptions = {}): UseOrcaQuery {
         const response = await postQuery({
           query: text,
           session_id: sessionId,
-          // Only the explicitly chosen location is sent. Device GPS reaches here by
-          // being *selected* in the picker, never by default.
           lat: locationRef.current?.lat ?? null,
           lon: locationRef.current?.lon ?? null,
+          language: languageRef.current,
         });
 
         setLatest(response);
@@ -95,18 +100,18 @@ export function useOrcaQuery(options: UseOrcaQueryOptions = {}): UseOrcaQuery {
           ),
         );
       } catch (exception) {
-        const text =
+        const message =
           exception instanceof OrcaApiError
             ? exception.displayText
-            : "Could not reach ORCA. Is the backend running?";
-        setError(text);
-        // Keep the failed turn in the list with its error, so the user can retry it
-        // rather than losing what they typed.
+            : "Could not reach ORCA. Is the backend running on port 8000?";
+        setError(message);
+        // Keep the failed turn in the list with its error, so it can be retried rather
+        // than the user losing what they typed.
         setMessages((current) =>
-          current.map((message) =>
-            message.id === pendingId
-              ? { ...message, text, pending: false, failed: true }
-              : message,
+          current.map((entry) =>
+            entry.id === pendingId
+              ? { ...entry, text: message, pending: false, failed: true }
+              : entry,
           ),
         );
       } finally {
@@ -121,14 +126,14 @@ export function useOrcaQuery(options: UseOrcaQueryOptions = {}): UseOrcaQuery {
       const trimmed = text.trim();
       if (!trimmed || loading) return;
 
-      const userId = `u-${Date.now()}`;
-      const pendingId = `o-${Date.now()}`;
+      const stamp = Date.now();
+      const pendingId = `o-${stamp}`;
 
-      // Optimistic append: the graph takes a few seconds, and a frozen screen reads as
-      // a crash.
+      // Optimistic append: the graph takes a few seconds, and a frozen screen reads as a
+      // crash.
       setMessages((current) => [
         ...current,
-        { id: userId, role: "user", text: trimmed },
+        { id: `u-${stamp}`, role: "user", text: trimmed },
         { id: pendingId, role: "orca", text: "", pending: true, query: trimmed },
       ]);
 
@@ -139,12 +144,14 @@ export function useOrcaQuery(options: UseOrcaQueryOptions = {}): UseOrcaQuery {
 
   const retry = useCallback(
     async (messageId: string) => {
-      const message = messages.find((m) => m.id === messageId);
+      const message = messages.find((entry) => entry.id === messageId);
       if (!message?.query || loading) return;
 
       setMessages((current) =>
-        current.map((m) =>
-          m.id === messageId ? { ...m, pending: true, failed: false, text: "" } : m,
+        current.map((entry) =>
+          entry.id === messageId
+            ? { ...entry, pending: true, failed: false, text: "" }
+            : entry,
         ),
       );
       await run(message.query, messageId);
@@ -156,9 +163,9 @@ export function useOrcaQuery(options: UseOrcaQueryOptions = {}): UseOrcaQuery {
     setMessages([]);
     setLatest(null);
     setError(null);
-    // A new session id starts a fresh conversation memory on the backend too.
-    setSessionId(newSessionId());
   }, []);
 
-  return { messages, latest, sessionId, loading, error, coords, ask, retry, reset };
+  const dismissError = useCallback(() => setError(null), []);
+
+  return { messages, latest, loading, error, gps, ask, retry, reset, dismissError };
 }

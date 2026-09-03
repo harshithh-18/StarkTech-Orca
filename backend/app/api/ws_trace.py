@@ -89,6 +89,19 @@ async def emit_answer(session_id: str, response: dict) -> None:
     await _send(session_id, "answer", response)
 
 
+async def emit_watch_alert(session_id: str, watch_id: str, alert) -> None:
+    """Push one proactive watch alert as a ``type='alert'`` frame.
+
+    Shares the trace socket deliberately: the client already holds it open for the
+    reasoning panel, and a push channel that needs its own connection is one that quietly
+    dies behind an idle-timeout proxy — which, in a safety feature, is the failure mode
+    you find out about afterwards.
+    """
+    payload = alert.model_dump(mode="json")
+    payload["watch_id"] = watch_id
+    await _send(session_id, "alert", payload)
+
+
 async def emit_error(session_id: str, code: str, message: str) -> None:
     """Push an error frame so the panel can stop spinning."""
     await _send(session_id, "error", {"code": code, "message": message})

@@ -117,10 +117,18 @@ def test_weather_fixture_has_real_cape_values():
 
 
 def test_lightning_source_string_declares_the_proxy():
-    """Overclaiming a modelled value as an observation is the failure we guard against."""
+    """Overclaiming a modelled value as an observation is the failure we guard against.
+
+    Two properties, and the second was added in P4: the caveat has to be *there*, and it
+    has to be readable. The original string said "Open-Meteo CAPE (modelled thunderstorm
+    proxy, not an IMD lightning observation)" — which declares the proxy correctly to a
+    meteorologist and to nobody else. This text is read by fishermen.
+    """
     source = open_meteo_weather.LIGHTNING_PROXY_SOURCE.casefold()
-    assert "proxy" in source
-    assert "imd" in source and "not" in source
+    assert "modelled" in source
+    assert "not an observed" in source
+    assert "cape" not in source, "the acronym means nothing to the reader"
+    assert "imd" not in source
 
 
 def test_wind_direction_excluded_from_peak_scan():

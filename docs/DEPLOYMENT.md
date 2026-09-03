@@ -44,7 +44,8 @@ after the backend is up:
 > — but then the frontend can't read them either, so setting them achieves nothing except
 > leaving a trap for whoever later "fixes" it by adding the prefix.
 
-Build settings are already in `vercel.json`; leave them alone.
+Build settings: set **Root Directory = `frontend`** and let Vercel auto-detect Vite.
+See [Frontend on Vercel](#frontend-on-vercel) below.
 
 ---
 
@@ -119,9 +120,19 @@ Spaces expose port 7860 — the container honours `$PORT`, so set `PORT=7860`.
 
 ## Frontend on Vercel
 
-1. Import the repo. `vercel.json` sets the build (`frontend/` → `frontend/dist`).
-2. Add **no** variables yet. Deploy.
-3. Once the backend is live, add `VITE_ORCA_API_BASE` and redeploy.
+1. Import the repo.
+2. **Set Root Directory to `frontend`.** This is the only build setting you touch — Vercel
+   then auto-detects Vite and fills in the rest (`npm install`, `npm run build`, `dist`).
+3. Add **no** environment variables yet. Deploy.
+4. Once the backend is live, add `VITE_ORCA_API_BASE` and **redeploy** — Vite compiles the
+   value into the bundle at build time, so setting it without rebuilding does nothing.
+
+> ### Don't add a `vercel.json`
+> There was one here and it caused a build failure: it specified
+> `cd frontend && npm run build`, but with Root Directory set Vercel already runs *inside*
+> `frontend/`, so the `cd` failed with "No such file or directory". The app has no
+> client-side router either, so it needed no rewrite rules. Root Directory plus Vercel's
+> Vite auto-detection is the whole configuration.
 
 ---
 

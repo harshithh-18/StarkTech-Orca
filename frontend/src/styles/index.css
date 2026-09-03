@@ -2,9 +2,40 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ORCA global styles. Owner: D */
+/**
+ * ORCA global styles.
+ *
+ * Owner: D
+ *
+ * The surface system is three deep, and every panel in the app picks one:
+ *
+ *   --surface-0   the page behind everything (slate-50 / abyss-950)
+ *   --surface-1   panels sitting on it        (white   / abyss-900)
+ *   --surface-2   cards sitting on a panel    (slate-50/ abyss-850)
+ *
+ * Anything that needs a fourth level is nested too deeply and should be flattened
+ * instead. Levels are declared as CSS variables rather than repeated Tailwind pairs so a
+ * component cannot invent its own shade of "panel" — which is how an interface ends up
+ * with six almost-identical greys.
+ */
 
 @layer base {
+  :root {
+    --surface-0: 248 250 252; /* slate-50  */
+    --surface-1: 255 255 255; /* white     */
+    --surface-2: 248 250 252; /* slate-50  */
+    --border-soft: 226 232 240; /* slate-200 */
+    --border-strong: 203 213 225; /* slate-300 */
+  }
+
+  html.dark {
+    --surface-0: 6 11 20;
+    --surface-1: 10 17 30;
+    --surface-2: 13 22 38;
+    --border-soft: 255 255 255 / 0.08;
+    --border-strong: 255 255 255 / 0.14;
+  }
+
   html,
   body,
   #root {
@@ -22,7 +53,11 @@
   }
 
   body {
-    @apply bg-slate-50 text-ocean-deep antialiased transition-colors duration-300;
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Tabular figures everywhere numbers are compared down a column — wave heights in a
+       tile grid jump horizontally without them, which reads as a rendering bug. */
+    font-variant-numeric: tabular-nums;
   }
 
   html.dark body {
@@ -37,7 +72,7 @@
   }
 
   html.dark * {
-    scrollbar-color: theme("colors.abyss.800") transparent;
+    scrollbar-color: theme("colors.abyss.700") transparent;
   }
 
   ::-webkit-scrollbar {
@@ -63,7 +98,7 @@
 
   /* A visible, on-brand focus ring — keyboard users and judges both notice. */
   :focus-visible {
-    @apply outline-none ring-2 ring-ocean-400 ring-offset-1 ring-offset-transparent;
+    @apply outline-none ring-2 ring-ocean-500 ring-offset-2 ring-offset-[rgb(var(--surface-0))];
   }
 
   /* Respect the OS setting. Someone with vestibular sensitivity should not have to sit
@@ -81,21 +116,104 @@
 }
 
 @layer components {
-  /* Frosted panel — the repeated surface treatment across chat, cards and trace. */
-  .panel {
-    @apply border border-slate-200/80 bg-white/80 backdrop-blur-sm transition-colors duration-300;
+  /* ── Surfaces ────────────────────────────────────────────────────────── */
+
+  .surface-1 {
+    background-color: rgb(var(--surface-1));
   }
 
-  html.dark .panel {
-    @apply border-white/10 bg-abyss-900/70;
+  .surface-2 {
+    background-color: rgb(var(--surface-2));
   }
 
-  .panel-solid {
-    @apply border border-slate-200 bg-white transition-colors duration-300;
+  .hairline {
+    @apply border-slate-200 dark:border-white/10;
   }
 
-  html.dark .panel-solid {
-    @apply border-white/10 bg-abyss-900;
+  /* A card on a panel. The one rounded, bordered box in the system. */
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-abyss-850;
+  }
+
+  /* ── Typography ──────────────────────────────────────────────────────── */
+
+  /* Section label above a group. Uppercase, tracked, never larger than 11px — it is
+     scaffolding for the eye, not content. */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400;
+  }
+
+  .panel-title {
+    @apply text-sm font-semibold text-slate-900 dark:text-slate-100;
+  }
+
+  .muted {
+    @apply text-slate-500 dark:text-slate-400;
+  }
+
+  /* ── Controls ────────────────────────────────────────────────────────── */
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg text-[13px] font-medium
+           transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  .btn-primary {
+    @apply btn bg-ocean-600 px-3 py-2 text-white hover:bg-ocean-500 active:scale-[0.98]
+           dark:bg-ocean-500 dark:hover:bg-ocean-400;
+  }
+
+  .btn-ghost {
+    @apply btn border border-slate-200 bg-white px-3 py-2 text-slate-700 hover:border-slate-300
+           hover:bg-slate-50 active:scale-[0.98]
+           dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200
+           dark:hover:border-white/20 dark:hover:bg-white/[0.08];
+  }
+
+  .btn-icon {
+    @apply btn h-9 w-9 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50
+           dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08];
+  }
+
+  /* A small status/metadata pill. Never interactive — use .btn-ghost for that. */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900
+           placeholder:text-slate-400 focus:border-ocean-500 focus:outline-none
+           focus:ring-2 focus:ring-ocean-500/20
+           dark:border-white/10 dark:bg-abyss-950 dark:text-slate-100 dark:placeholder:text-slate-500;
+  }
+
+  /* ── Verdict colouring ───────────────────────────────────────────────── */
+  /* Semantic, and never colour alone: every use pairs these with a word and an icon. */
+
+  .band-go {
+    @apply text-emerald-700 dark:text-emerald-300;
+  }
+  .band-caution {
+    @apply text-amber-700 dark:text-amber-300;
+  }
+  .band-no_go {
+    @apply text-rose-700 dark:text-rose-300;
+  }
+  .band-none {
+    @apply text-slate-600 dark:text-slate-300;
+  }
+
+  .bg-band-go {
+    @apply bg-emerald-500/10 dark:bg-emerald-400/10;
+  }
+  .bg-band-caution {
+    @apply bg-amber-500/10 dark:bg-amber-400/10;
+  }
+  .bg-band-no_go {
+    @apply bg-rose-500/10 dark:bg-rose-400/10;
+  }
+  .bg-band-none {
+    @apply bg-slate-500/[0.06] dark:bg-white/[0.04];
   }
 
   /* Skeleton shimmer for loading states. */
@@ -103,52 +221,128 @@
     background-image: linear-gradient(
       90deg,
       transparent 0%,
-      rgb(255 255 255 / 0.35) 50%,
+      rgb(148 163 184 / 0.18) 50%,
       transparent 100%
     );
     background-size: 200% 100%;
     @apply animate-shimmer;
   }
+
+  html.dark .shimmer {
+    background-image: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.06) 50%,
+      transparent 100%
+    );
+  }
 }
+
+/* ── Leaflet ────────────────────────────────────────────────────────────── */
 
 /* Leaflet must fill its container or the map renders zero-height. */
 .leaflet-container {
   height: 100%;
   width: 100%;
-  @apply bg-slate-200;
+  @apply bg-slate-200 font-sans;
 }
 
 html.dark .leaflet-container {
-  @apply bg-abyss-900;
+  @apply bg-abyss-950;
 }
 
-/* Leaflet's own chrome is hard-coded light; restyle it rather than leaving white boxes
-   floating on a dark map. */
-html.dark .leaflet-tile-pane {
-  /* Tint OSM's light tiles toward the dark palette. Cheaper and more reliable than
-     depending on a third-party dark tile server that could be down on demo day. */
+/* Tint a light basemap toward the dark palette. Cheaper and more reliable than depending
+   on a third-party dark tile server that could be down on demo day.
+
+   Applied to the individual tile layer, NOT to the whole tile pane: a CSS filter on an
+   ancestor cannot be cancelled by a descendant, so a pane-level filter would also invert
+   the ocean basemap — which is already dark, and comes back as glowing white bathymetry.
+   Each layer opts in through `invertInDark` in mapConfig. */
+html.dark .leaflet-tile-pane .orca-invert {
   filter: invert(1) hue-rotate(185deg) brightness(0.92) contrast(0.9) saturate(0.75);
 }
 
-html.dark .leaflet-control-attribution,
-html.dark .leaflet-control-zoom a {
-  @apply border-white/10 bg-abyss-900/90 text-slate-300;
+/* For tiles that are already blue-and-deep and must NOT be inverted — a bathymetric chart
+   gets darker with depth, so inverting it makes the open ocean the brightest thing on the
+   page. Dimming keeps deep water deep and pushes the land back. */
+html.dark .leaflet-tile-pane .orca-dim {
+  filter: brightness(0.48) saturate(1.15) contrast(1.08);
 }
 
-html.dark .leaflet-control-zoom a:hover {
-  @apply bg-abyss-800 text-white;
-}
-
-html.dark .leaflet-popup-content-wrapper,
-html.dark .leaflet-popup-tip {
-  @apply bg-abyss-800 text-slate-100;
-}
-
-/* Markers and overlays must NOT be inverted with the tiles, or a green fishing zone
-   renders magenta. Counter-rotate the panes that sit above the tiles. */
+/* Overlay panes are siblings of the tile pane, so they are unaffected by the filter above
+   — a green fishing zone stays green. Stated explicitly because the obvious
+   implementation (filtering the whole map container) breaks exactly that. */
 html.dark .leaflet-overlay-pane,
 html.dark .leaflet-marker-pane,
 html.dark .leaflet-shadow-pane,
 html.dark .leaflet-tooltip-pane {
   filter: none;
+}
+
+/* The zoom control, restyled to match the app's buttons rather than Leaflet's 2011 look. */
+.leaflet-control-zoom {
+  @apply overflow-hidden rounded-lg border border-slate-200 shadow-sm dark:border-white/10;
+  border-width: 1px !important;
+}
+
+.leaflet-control-zoom a {
+  @apply flex items-center justify-center bg-white text-slate-600 transition-colors
+         hover:bg-slate-50 hover:text-ocean-600 dark:bg-abyss-900 dark:text-slate-300
+         dark:hover:bg-abyss-800 dark:hover:text-ocean-300;
+  border-bottom-color: rgb(226 232 240) !important;
+}
+
+html.dark .leaflet-control-zoom a {
+  border-bottom-color: rgb(255 255 255 / 0.1) !important;
+}
+
+.leaflet-control-attribution {
+  @apply rounded-tl-md border-t border-slate-200 bg-white/85 px-1.5 text-[10px] text-slate-500
+         backdrop-blur dark:border-white/10 dark:bg-abyss-950/85 dark:text-slate-400;
+}
+
+.leaflet-control-attribution a {
+  @apply text-ocean-600 dark:text-ocean-300;
+}
+
+.leaflet-popup-content-wrapper {
+  @apply rounded-xl border border-slate-200 bg-white text-slate-800 shadow-lg
+         dark:border-white/10 dark:bg-abyss-850 dark:text-slate-100;
+}
+
+.leaflet-popup-content {
+  @apply m-0 p-3 text-[12.5px] leading-relaxed;
+}
+
+.leaflet-popup-tip {
+  @apply bg-white dark:bg-abyss-850;
+}
+
+.leaflet-popup-close-button {
+  @apply text-slate-400 hover:text-slate-700 dark:hover:text-slate-100;
+}
+
+/* The user's pin. A div marker rather than Leaflet's PNG so it inherits the palette and
+   stays crisp on a retina screen.
+
+   Both children are absolutely positioned over the icon box. Laying them out with a grid
+   instead stacks them in two rows inside a 14px square, which squashes the dot into a
+   thin vertical bar — the pin looked like a rendering artefact rather than a marker. */
+.orca-pin {
+  position: relative;
+}
+
+.orca-pin-dot,
+.orca-pin-pulse {
+  position: absolute;
+  inset: 0;
+}
+
+.orca-pin-dot {
+  @apply rounded-full border-2 border-white bg-ocean-500 shadow-md
+         dark:border-abyss-950 dark:bg-ocean-400;
+}
+
+.orca-pin-pulse {
+  @apply animate-pulse-ring rounded-full bg-ocean-400;
 }

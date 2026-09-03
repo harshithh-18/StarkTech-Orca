@@ -58,6 +58,12 @@ def select_layers(intent: Intent, state: dict) -> list[MapLayer]:
     if geofence.get("near_mpa") and MapLayer.MPA_ZONES not in layers:
         layers.append(MapLayer.MPA_ZONES)
 
+    # The detected thermal fronts, but only when there are some. This is the layer that
+    # shows *why* a fishing zone is where it is, so it belongs on the two answers that are
+    # about productivity — and nowhere else, or it becomes wallpaper.
+    if marine.get("fronts") and intent in (Intent.PFZ_LOOKUP, Intent.DIAGNOSTIC):
+        layers.append(MapLayer.OCEAN_FRONTS)
+
     if state.get("alerts"):
         layers.append(MapLayer.HAZARD_OVERLAY)
 

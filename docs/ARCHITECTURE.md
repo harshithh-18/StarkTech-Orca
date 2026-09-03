@@ -110,6 +110,38 @@ Taking golden query #2, *"Is it safe to sail tomorrow near Kakinada?"*:
 Multi-turn — *"…and is it safe there?"* — works because `session_id` keys the graph
 checkpointer, so the PFZ location from the previous turn is still in state.
 
+## The two paths that do not start with a question (P4)
+
+Everything above describes a *conversational turn*: text in, graph run, answer out. Two
+later additions deliberately bypass the graph, and the reason is worth stating because
+"why isn't this an agent?" is the obvious question.
+
+```
+  GET /api/conditions ──► services/conditions.py ──┬─► adapters (marine, weather)
+                                                   ├─► services/risk_rules  (the verdict)
+                                                   └─► services/safe_window (when next)
+
+  POST /api/watch ──────► services/watch.py ───────► services/conditions (on a timer)
+                                    │
+                                    └─► api/ws_trace.emit_watch_alert ──► the same socket
+```
+
+Neither runs a planner and neither makes a choice. The conditions snapshot is a fixed
+bundle of the adapters the specialists already use, reduced through the same threshold
+module; routing it through the graph would add a language-detection round trip and a
+fan-out decision to a request that has no language and no decision.
+
+**What makes this safe is that the verdict is not reimplemented.** `conditions.py` calls
+`agents.risk.assess`, which calls `risk_rules.evaluate` — byte for byte the function the
+safety agent uses. A dashboard that disagreed with the chat answer would be worse than no
+dashboard, and sharing the function is what makes that impossible rather than unlikely.
+`test_conditions.py::test_the_verdict_matches_the_shared_risk_rules` pins it.
+
+A watch is that same snapshot on an `asyncio` timer, with a set of already-announced
+fingerprints so a persisting hazard is reported once rather than every cycle. Watches are
+in-process and do not survive a restart — and the interface says so, rather than implying a
+durability the deployment does not have.
+
 ## Failure behaviour
 
 A specialist that fails does **not** fail the run. It appends a `skipped` trace step with
@@ -127,7 +159,8 @@ last rung for demo day.
 | `backend/app/api/`, `backend/app/adapters/`, `backend/app/services/cache.py` | **B** |
 | `backend/app/schemas/`, `backend/app/services/explainability.py`, `backend/app/rag/` | **C** |
 | `frontend/` | **D** |
-| `backend/app/services/{risk_rules,pfz_proxy}.py`, `agents/{geospatial,route,marine_data}.py` | **E** |
+| `backend/app/services/{risk_rules,pfz_proxy,safe_window,fronts}.py`, `agents/{geospatial,route,marine_data}.py` | **E** |
+| `backend/app/services/{conditions,watch}.py`, `backend/app/api/routes_conditions.py` | **B + E** |
 | `backend/app/i18n/`, voice pipeline, mobile view | **F** |
 
 Full role detail in [TEAM.md](TEAM.md).

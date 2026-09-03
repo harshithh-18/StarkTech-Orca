@@ -62,6 +62,10 @@ async def query(request: QueryRequest) -> OrcaResponse:
         "verdict": None,
         "verdict_reasons": [],
         "plan": [],
+        # Also per-turn. The checkpointer keeps last-write-wins fields across turns, so a
+        # question asked from Hyderabad would leave every later question in the same
+        # session answering as though it were inland too.
+        "inland": False,
     }
     # Clear the append-reducer fields so this turn starts clean. The checkpointer keeps
     # the remembered location (that's the multi-turn feature); it must not also keep the

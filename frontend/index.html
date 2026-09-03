@@ -9,7 +9,11 @@
       name="description"
       content="Ask about fishing zones, sea safety and maritime boundaries in your own language."
     />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐋</text></svg>" />
+    <!-- The brand mark. Falls back to the emoji glyph if the artwork is not present, so a
+         missing file costs a favicon rather than showing a broken-image tab icon. -->
+    <link rel="icon" type="image/png" href="/orca-logo.png" />
+    <link rel="alternate icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐋</text></svg>" />
+    <link rel="apple-touch-icon" href="/orca-logo.png" />
 
     <script>
       // Applied BEFORE first paint. Deciding the theme in React instead would flash a

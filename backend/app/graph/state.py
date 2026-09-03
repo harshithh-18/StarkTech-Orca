@@ -79,6 +79,12 @@ class OrcaState(TypedDict, total=False):
     geofence: dict[str, Any]   # containment + distance to nearest boundary
     route: dict[str, Any]      # stretch
 
+    # Set when a specialist reported that this point has no sea within range. Its own
+    # field rather than an inference from `skipped_agents`, because "there is no sea here"
+    # and "the sea model is down" demand completely different answers — see
+    # `nodes._run_specialist` and `nodes.risk_node`.
+    inland: bool
+
     # ── Risk ──────────────────────────────────────────────────────────────
     verdict: Verdict | None
     verdict_reasons: list[str]  # which rules fired, in plain English

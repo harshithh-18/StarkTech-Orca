@@ -58,14 +58,20 @@ evidence the problem statement is asking for.
 
 | Source | Gives us | Auth | Adapter |
 |--------|----------|------|---------|
-| Open-Meteo Marine | Wave height/period/direction, swell, SST, currents | none | `open_meteo_marine.py` |
+| Open-Meteo Marine | Wave height/period/direction, swell, SST, currents, **tide** | none | `open_meteo_marine.py` |
 | Open-Meteo Weather | Wind, precip, temp, weather codes, thunderstorm probability | none | `open_meteo_weather.py` |
 | Open-Meteo Geocoding | Place name → lat/lon | none | `open_meteo_geocoding.py` |
 | Copernicus Marine | Gridded chlorophyll-a + SST (NetCDF) | free account | `copernicus.py` |
 | INCOIS PFZ | Official Potential Fishing Zones | none (scrape) | `incois_pfz.py` |
-| IMD / RSMC | Cyclone + severe weather bulletins | none (scrape) | `imd_bulletins.py` |
+| IMD wind bands | Cyclone **classification** of a modelled field (see below) | none | `imd_bulletins.py` |
 | Marine Regions EEZ | India EEZ + IMBL polygons | download | `geojson_store.py` |
 | Protected Planet (WDPA) | Marine Protected Areas | download | `geojson_store.py` |
+
+Two entries in that table are **computed, not retrieved**, and both say so in every
+`Evidence.source` string they produce: the PFZ proxy and the cyclone classification. A
+third — the tide — is a model field rather than a port tide table. The Sources view in the
+frontend repeats all three in plain language, because a user who cannot tell an official
+advisory from our arithmetic cannot calibrate how much to trust either.
 
 ---
 
@@ -212,16 +218,99 @@ and are not issued during the fishing ban period — handle the empty case, don'
 Also from INCOIS, lower priority: **Ocean State Forecast** and **Marine Heat Wave**
 advisories — useful supporting evidence for query #4.
 
-## IMD / RSMC cyclone bulletins
+## Cyclones — resolved as a declared proxy (P4)
 
-`https://mausam.imd.gov.in/` and the RSMC New Delhi bulletins.
+### The scrape is not possible, and that was verified rather than assumed
 
-Cyclone and lightning data are genuinely hard to obtain cleanly. Our approach: IMD bulletins
-where parseable, plus Open-Meteo's `thunderstorm_probability` as a proxy.
+Every documented IMD entry point returns HTTP 404 (checked 3 Sep 2026):
 
-> **Say this out loud in the demo.** "Lightning risk here is a modelled proxy, not an IMD
-> lightning observation." Judges respect a team that knows the limits of its own data far
-> more than one that overclaims. Surface it in the evidence `source` string too.
+```
+mausam.imd.gov.in/api/cyclone_api.php                       404
+rsmcnewdelhi.imd.gov.in/api/cyclone                         404
+mausam.imd.gov.in/responsive/rss/allIndiaWeatherReport.xml  404
+internal.imd.gov.in/pages/cyclone_mainpage.php              404
+```
+
+That is the same conclusion the team reached for INCOIS, and the same answer follows:
+build a proxy from a source that *does* respond, and label it as a proxy everywhere.
+
+### What `imd_bulletins.py` actually does
+
+Samples mean-sea-level pressure and sustained 10 m wind on a 250 km ring around the
+location and classifies the result against **IMD's own published wind bands** for the north
+Indian Ocean:
+
+| Band | Sustained wind |
+|------|----------------|
+| Low pressure area | < 31 km/h |
+| Depression | 31–49 km/h |
+| Deep depression | 50–61 km/h |
+| Cyclonic storm | 62–88 km/h |
+| Severe cyclonic storm | 89–117 km/h |
+| Very severe and above | ≥ 118 km/h |
+
+A system is reported only when **both** tests pass: gale-force sustained wind *and* a
+pressure centre below 1000 hPa. Wind alone is a squall line; low pressure alone is the
+monsoon trough. Requiring both is what stops this crying cyclone every July.
+
+Only a **cyclonic storm or worse** sets `cyclone_bulletin_active`, the flag that raises the
+CYCLONE alert and caps the safety verdict. A depression is named and left as context.
+
+> ## This is not a cyclone warning.
+> It is a model field, classified. IMD issues warnings; ORCA does not, and every evidence
+> `source` string says so. When IMD has a bulletin out, IMD's bulletin is the authority and
+> this proxy is at best a corroboration. **Say that out loud in the demo.**
+
+The check always returns evidence — including an explicit `cyclone_bulletin_active: false`
+— because absence of a warning is not evidence of safety, and the trace should show that
+the check ran. An empty list would be indistinguishable from the check never happening.
+
+### Lightning stays CAPE
+
+Unchanged from P2 and still correct: the lightning signal is Open-Meteo's CAPE, which says
+the atmosphere is capable of storms. It is not an observed strike. `open_meteo_weather.py`
+documents why `thunderstorm_probability` could not be used (it returns null for every hour).
+
+---
+
+## Tides — modelled sea level (P4)
+
+Open-Meteo Marine publishes `sea_level_height_msl`, the modelled sea-surface height above
+mean sea level. That is the tidal signal, and it arrives on the **same request** the sea
+state already makes, so it costs nothing extra and cannot disagree with the rest of the
+forecast.
+
+Turning points are found by sign change in the hourly difference rather than by harmonic
+analysis. At hourly resolution that lands within about 30 minutes of true slack water,
+which is the honest precision to claim from a one-hour series — a boat crossing a harbour
+bar needs "high water is around 06:00", not a second-accurate prediction.
+
+**It is not a port tide table.** The evidence source says so, and so does the tide card in
+the frontend. For a bar crossing, use the official table.
+
+---
+
+## Thermal fronts — computed from SST (P4)
+
+`services/fronts.py`. Classical edge detection on the SST field, which is what "front
+detection" means in an oceanographic context:
+
+1. NaN-aware 3×3 box smoothing, to kill single-pixel satellite noise
+2. gradient magnitude in °C/km, longitude spacing scaled by cos(latitude)
+3. threshold at `pfz_proxy.SST_FRONT_GRADIENT_THRESHOLD_C_PER_KM` — the top ~10% of the
+   local gradient field, the operational definition of a front
+4. connected-component labelling into distinct features
+5. a **shape heuristic**: compact features are reported as `eddy_like`, elongated ones as
+   `front`
+
+Step 5 is not a dynamical eddy detection — that needs sea-surface height and geostrophic
+velocity, which the SST subset does not carry. The feature type is therefore `eddy_like`,
+never `eddy`, and each feature's `method` property records exactly what was done.
+
+Features below `MIN_FRONT_AREA_KM2` (800 km²) are discarded. That floor is set by what the
+smoother leaves behind: a 3×3 boxcar spreads one bad pixel across a 5×5 gradient
+neighbourhood, about a dozen cells of which clear the threshold — roughly 350 km² on the
+0.05° grid. One hot pixel is not an ocean front.
 
 ## Marine Regions — EEZ and IMBL
 

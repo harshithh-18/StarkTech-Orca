@@ -10,6 +10,9 @@ verdict + the evidence and reasoning behind it**.
 
 > **Status: demo-ready.** All five golden queries answer end-to-end on real data, in five
 > languages, with a live agent trace, dark mode, voice in and out, and an offline demo mode.
+> P4 adds the parts a platform needs beyond answering questions: a live conditions
+> dashboard, the next safe departure window, proactive safety watches, tides, thermal-front
+> detection and a cyclone classifier — and a rebuilt console interface.
 > See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 >
 > **It runs with no API keys at all.** Every agent has a deterministic fallback, so
@@ -18,14 +21,23 @@ verdict + the evidence and reasoning behind it**.
 
 ---
 
-## The three things that make ORCA different
+## The four things that make ORCA different
 
 1. **Visible reasoning.** Every answer streams its agent trace live — you watch the platform
-   think. See [`ReasoningTrace.tsx`](frontend/src/components/ReasoningTrace.tsx).
+   think. See [`ReasoningTrace.tsx`](frontend/src/components/insight/ReasoningTrace.tsx).
 2. **Evidence, not assertions.** Every answer carries an `evidence[]` array with value,
    source and timestamp. Baked into the schema, not bolted on. See [docs/API_CONTRACT.md](docs/API_CONTRACT.md).
 3. **Speaks the user's language.** Query in Tamil, get the answer in Tamil — via Bhashini,
    the Government of India's own Indic language stack.
+4. **It speaks first.** A conditions dashboard that is already true before you type
+   anything, the next safe departure window when the answer is no, and a standing watch
+   that warns you when conditions turn. See
+   [`services/watch.py`](backend/app/services/watch.py).
+
+And one thing it refuses to do: overclaim. The fishing zones are **computed**, the lightning
+risk is **modelled**, the cyclone reading is a **classification of a model field**, and the
+tide is **not a port table** — each says so in its own evidence source, and the Sources view
+repeats all four in plain language.
 
 ## Golden path — the queries that must be flawless
 
@@ -40,6 +52,15 @@ verdict + the evidence and reasoning behind it**.
 Plus one multi-turn beat — *"…and is it safe there?"* after #1 — to prove conversational
 memory, and **voice**: ask by mic in your own language and hear the verdict read back.
 Full detail in [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
+
+Beyond the golden path, the console answers without being asked:
+
+| Surface | What it shows |
+|---------|---------------|
+| **Conditions** | Eight live readings against their small-craft limits, the verdict, the tide, the 48-hour curves — for the chosen harbour, with no question typed |
+| **Alerts** | A standing watch that re-checks conditions and boundary distance on a timer and pushes what turned worse |
+| **Layers** | Every layer ORCA can draw, what it means and where it came from — fishing zones, thermal fronts, EEZ, IMBL, MPAs, wave field, chlorophyll, SST, hazard cells |
+| **Sources** | Every value behind the current answer, and a plain-language list of what is computed rather than issued |
 
 ## Architecture
 
@@ -78,7 +99,11 @@ Orca/
 │       ├── services/    Cache, risk rules, PFZ proxy, explainability, LLM
 │       ├── i18n/        Bhashini / Sarvam
 │       └── rag/         ChromaDB advisory + rule retrieval
-├── frontend/      React + Vite + Leaflet — chat, map, verdict card, reasoning trace
+├── frontend/      React + Vite + Leaflet — a five-view console around a persistent map
+│   └── src/
+│       ├── components/  shell · conversation · conditions · alerts · map · insight
+│       ├── hooks/       one socket, many listeners; profile, conditions, watch, voice
+│       └── types/       ⭐ the TS mirror of the response contract
 ├── data/          GeoJSON boundaries, Copernicus subsets, cache, demo mocks (gitignored)
 └── scripts/       One-shot P0 data-access spikes
 ```
@@ -107,7 +132,8 @@ is live, and what command fixes anything missing. Check it before demoing.
 python -m app.adapters.open_meteo_marine     # real wave height for Kakinada
 python -m app.adapters.open_meteo_weather    # real wind + CAPE
 python -m app.adapters.open_meteo_geocoding  # Kakinada → 16.99, 82.24
-pytest backend/tests/                        # 144 tests, no network required
+python -m app.adapters.imd_bulletins         # cyclone classification for three ports
+pytest backend/tests/                        # 211 tests, no network required
 ```
 
 ## Getting the data
@@ -119,7 +145,7 @@ until it lands the responsible agent emits a visible `skipped` step naming the f
 |------|---------|-----|
 | **Gemini key** (free) | Answers in the user's language, better edge-case classification | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → `GEMINI_API_KEY` in `.env` |
 | **Groq key** (free) | Fallback when Gemini rate-limits | [console.groq.com](https://console.groq.com) → API Keys → Create → `GROQ_API_KEY` |
-| **Copernicus account** (free) | Golden query #1 — the computed PFZ proxy | [register](https://data.marine.copernicus.eu/register), then `copernicusmarine login` and `python scripts/fetch_copernicus_subset.py` |
+| **Copernicus account** (free) | Golden query #1 — the computed PFZ proxy, and thermal-front detection | [register](https://data.marine.copernicus.eu/register), then `copernicusmarine login` and `python scripts/fetch_copernicus_subset.py` |
 | **EEZ / IMBL polygons** | Golden query #3 — geofencing | `python scripts/download_geojson.py` — fetches both automatically from Marine Regions' public WFS, no form needed |
 | **MPA polygons** (optional) | Protected-area breach alerts | [Protected Planet](https://www.protectedplanet.net/country/IND) → accept terms → drop the zip in `data/geojson/raw/` and re-run the script |
 | **Knowledge base** (optional) | Answers to general marine questions | `python -m app.rag.ingest` — first run downloads a small embedding model |

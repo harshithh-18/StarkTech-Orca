@@ -54,7 +54,11 @@ async def lifespan(app: FastAPI):
 
     from app.adapters.base import close_client
     from app.graph.builder import close_graph
+    from app.services.watch import cancel_all
 
+    # Watches hold background tasks; leaving them running past shutdown keeps the event
+    # loop alive and turns a clean stop into a hang.
+    await cancel_all()
     await close_client()
     await close_graph()
     logger.info("ORCA shut down cleanly")
@@ -79,11 +83,18 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    from app.api import routes_health, routes_layers, routes_query, ws_trace
+    from app.api import (
+        routes_conditions,
+        routes_health,
+        routes_layers,
+        routes_query,
+        ws_trace,
+    )
 
     app.include_router(routes_health.router)
     app.include_router(routes_query.router)
     app.include_router(routes_layers.router)
+    app.include_router(routes_conditions.router)
     app.include_router(ws_trace.router)
 
     @app.exception_handler(HTTPException)

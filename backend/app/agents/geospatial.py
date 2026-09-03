@@ -47,10 +47,48 @@ _COMPASS_WORDS = {
     "W": "west", "WNW": "west-northwest", "NW": "north-west", "NNW": "north-northwest",
 }
 
+# ── What we call these boundaries when speaking to a person ───────────────
+#
+# The official names are acronyms of acronyms — EEZ, IMBL, MPA — and they were surfacing
+# raw in answers, alert banners and map legends. A fisherman reading "you are 2 km from the
+# IMBL" has to already know what an IMBL is before the warning means anything, which is
+# exactly backwards for a warning.
+#
+# So every user-facing string uses BOUNDARY_LABELS, in the words a person would use. The
+# official term is kept in BOUNDARY_TERMS and shown once, parenthetically, in the places a
+# researcher or a port authority would look for it — the Layers list and the Sources view.
+# Plain language for everyone; the technical name still findable by whoever needs it.
+#
+# The labels are written to slot into two sentence shapes without re-reading oddly:
+#     "You are {distance} km from {label}"
+#     "{inside|outside} {label}, boundary {distance} km away"
 BOUNDARY_LABELS = {
-    "eez": "India's Exclusive Economic Zone",
-    "imbl": "the International Maritime Boundary Line",
-    "mpa": "a Marine Protected Area",
+    "eez": "India's own waters",
+    "imbl": "the sea border with a neighbouring country",
+    "mpa": "a protected marine area",
+}
+
+BOUNDARY_TERMS = {
+    "eez": "Exclusive Economic Zone (EEZ)",
+    "imbl": "International Maritime Boundary Line (IMBL)",
+    "mpa": "Marine Protected Area (MPA)",
+}
+
+# One sentence each, for a first-time reader: what the boundary is, and whether being on
+# the wrong side of it actually matters. The third clause is the one that counts — two of
+# these three are informational and one gets boats seized.
+BOUNDARY_MEANING = {
+    "eez": (
+        "the sea India controls, out to 200 nautical miles from the coast. Fishing "
+        "outside it is not illegal — it is simply beyond India's own waters"
+    ),
+    "imbl": (
+        "the line where India's waters meet another country's. Crossing it without "
+        "permission is what gets fishing boats detained"
+    ),
+    "mpa": (
+        "a conservation area for marine life, where fishing may be restricted or banned"
+    ),
 }
 
 # Layers that are LINES, not regions. A line has no interior, so `contains()` is always
