@@ -1,36 +1,5 @@
 /**
- * ORCA application shell.
- *
- * Owner: D · Phase: P1 · Rebuilt P4
- *
- * ## Layout
- *
- * Desktop (≥1280px):
- *
- *   ┌───────────────────────────────────────────────────────────────────┐
- *   │ TopBar — brand · working location · language · live · theme       │
- *   ├──┬────────────────────┬───────────────────────┬───────────────────┤
- *   │  │                    │                       │                   │
- *   │N │  Primary panel     │   Map                 │  Insight rail     │
- *   │a │  (the current      │   (always visible —   │  (only when there │
- *   │v │   nav view)        │    it is the point)   │   is an answer)   │
- *   │  │                    │                       │                   │
- *   ├──┴────────────────────┴───────────────────────┴───────────────────┤
- *   │ Reasoning trace — collapsible, streams live                       │
- *   └───────────────────────────────────────────────────────────────────┘
- *
- * Below 1280px the insight rail becomes a sheet over the map. Below 768px the nav rail
- * becomes a bottom tab bar, the map is its own destination, and only one panel is on
- * screen at a time — because stacking four panels into a phone viewport buries the
- * verdict under three scrolls, and the verdict is what the user came for.
- *
- * ## What lives here and what does not
- *
- * This file owns exactly three things: the session id, which view is showing, and which
- * map layers are on. Everything else is a hook or a panel. The session id in particular
- * has to be owned in one place — it keys the graph checkpointer (multi-turn memory), the
- * trace socket and the watch, and three components minting their own would silently
- * disconnect all three from each other.
+ * ORCA application shell — Maritime Operations & Intelligence Console.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -60,7 +29,7 @@ import { useReasoningTrace } from "@/hooks/useReasoningTrace";
 import { useTheme } from "@/hooks/useTheme";
 import { useVoice } from "@/hooks/useVoice";
 import { useWatch } from "@/hooks/useWatch";
-import type { ChatMessage, Language, MapLayer, OrcaResponse } from "@/types/orca";
+import type { ChatMessage, Language, MapLayer, OrcaResponse, WatchAlert } from "@/types/orca";
 
 export default function App() {
   const theme = useTheme();
@@ -73,10 +42,7 @@ export default function App() {
     reopenSetup,
   } = useProfile();
 
-  // One id for the whole conversation: it keys the backend's multi-turn memory, the trace
-  // socket and any watch. `New` mints a fresh one, which is what starts a clean memory.
   const [sessionId, setSessionId] = useState(newSessionId);
-
   const [view, setView] = useState<View>("ask");
   const [manualLayers, setManualLayers] = useState<MapLayer[]>([]);
   const [basemap, setBasemap] = useState<BasemapId>("ocean");
@@ -88,12 +54,8 @@ export default function App() {
   const watch = useWatch(sessionId, socket.subscribe);
   const conditions = useConditions(profile.location);
 
-  // The language of the last answer — what dictation and speech should use next, since a
-  // Telugu speaker's follow-up will also be in Telugu.
   const [spokenLanguage, setSpokenLanguage] = useState<Language>(profile.language);
   const voice = useVoice((transcript) => ask(transcript));
-  // Pulled out because `voice` is a fresh object each render while `speak` is a stable
-  // callback — depending on the object would rebuild every consumer on every render.
   const { speak } = voice;
 
   const handleResponse = useCallback(
@@ -102,15 +64,10 @@ export default function App() {
       setSpokenLanguage(response.language);
       setRailOpen(true);
 
-      // Speak safety verdicts without being asked. Someone on a boat at 4 a.m. may not be
-      // looking at the screen, and the answer leads with the verdict — so the first thing
-      // heard is "do not go to sea", not a preamble.
       if (response.verdict && response.verdict !== "NOT_APPLICABLE") {
         speak(response.answer, response.language);
       }
 
-      // A new answer picks its own layers; drop manual additions so the map reflects the
-      // current question rather than accumulating every past one.
       setManualLayers([]);
     },
     [trace, speak],
@@ -124,6 +81,15 @@ export default function App() {
       onResponse: handleResponse,
       onAskStart: trace.begin,
     });
+
+  const handleAskPrompt = useCallback(
+    (prompt: string) => {
+      setView("ask");
+      setMobileMap(false);
+      ask(prompt);
+    },
+    [ask],
+  );
 
   const answerLayers = useMemo<MapLayer[]>(
     () => latest?.map_layers ?? ["user_pin"],
@@ -162,30 +128,24 @@ export default function App() {
     [voice, spokenLanguage],
   );
 
-  // Alerts shown as a banner: whichever surface is more current. A live answer's alerts
-  // are a response to something just asked, so all of them show; the dashboard's were not
-  // asked for, so only the consequential ones break through. See AlertBanner.
   const answerAlerts = latest?.alerts ?? [];
   const bannerAlerts = answerAlerts.length ? answerAlerts : conditions.data?.alerts ?? [];
   const bannerThreshold = answerAlerts.length ? undefined : CONSEQUENTIAL;
 
   const usedMockData = Boolean(latest?.used_mock_data || conditions.data?.used_mock_data);
 
-  // Opening the Alerts view is what marks them read. Depends on `markRead` (a stable
-  // callback) rather than on `watch`, which is a fresh object every render.
   const { markRead } = watch;
   useEffect(() => {
     if (view === "alerts") markRead();
   }, [view, markRead]);
 
-  // ⌘K focuses the composer from anywhere in the app.
+  // ⌘K focuses composer
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setView("ask");
         setMobileMap(false);
-        // Deferred: the input may not be mounted yet if the view just changed.
         requestAnimationFrame(() => document.getElementById("orca-input")?.focus());
       }
     };
@@ -193,7 +153,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // ── First run ──────────────────────────────────────────────────────────
+  // ── First Run Onboarding ──────────────────────────────────────────────
   if (!profile.onboarded) {
     return (
       <WelcomeScreen
@@ -209,7 +169,6 @@ export default function App() {
     );
   }
 
-  // Shared by the desktop rail and the mobile bar — the same navigation in two positions.
   const navProps = {
     view,
     onChange: (next: View) => {
@@ -228,25 +187,25 @@ export default function App() {
     <button
       type="button"
       onClick={() => setView("alerts")}
-      className="flex w-full items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-ocean-400 dark:border-white/10 dark:bg-abyss-850 dark:hover:border-ocean-500/60"
+      className="flex w-full items-center gap-3 rounded-2xl border border-sky-100 bg-white/95 p-3 text-left transition-all hover:border-ocean-400 hover:shadow-md dark:border-white/10 dark:bg-abyss-850 dark:hover:border-cyan-400/40"
     >
       <span
-        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl font-bold ${
           watch.status?.watch.active
-            ? "bg-emerald-500/15 band-go"
-            : "bg-ocean-500/10 text-ocean-600 dark:bg-ocean-400/10 dark:text-ocean-300"
+            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 shadow-sm"
+            : "bg-ocean-500/10 text-ocean-700 dark:bg-ocean-400/10 dark:text-cyan-300"
         }`}
       >
-        <Icon name={watch.status?.watch.active ? "shield" : "bell"} size={16} />
+        <Icon name={watch.status?.watch.active ? "shield" : "radar"} size={17} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[12.5px] font-semibold text-slate-900 dark:text-slate-100">
-          {watch.status?.watch.active ? "Watch is running" : "Get warned without asking"}
+        <span className="block text-[13px] font-bold text-slate-900 dark:text-slate-100">
+          {watch.status?.watch.active ? "Safety Watch Active" : "Arm Automated Watch"}
         </span>
         <span className="block text-[11px] leading-snug muted">
           {watch.status?.watch.active
-            ? `${watch.alerts.length} alert${watch.alerts.length === 1 ? "" : "s"} raised so far`
-            : "ORCA re-checks this spot and tells you when conditions turn."}
+            ? `${watch.alerts.length} event${watch.alerts.length === 1 ? "" : "s"} logged for this station`
+            : "ORCA runs periodic background sweeps and notifies you of hazard changes."}
         </span>
       </span>
       <Icon name="arrow-right" size={14} className="text-slate-300 dark:text-slate-600" />
@@ -260,7 +219,7 @@ export default function App() {
           messages={messages}
           loading={loading}
           role={profile.role}
-          locationName={profile.location.name ?? "the selected point"}
+          locationName={profile.location.name ?? "the selected coordinates"}
           onAsk={ask}
           conditions={conditions.data}
           conditionsLoading={conditions.loading}
@@ -288,6 +247,7 @@ export default function App() {
           isDark={theme.isDark}
           watchSlot={watchToggle}
           onGoToCoast={setLocation}
+          onAskPrompt={handleAskPrompt}
         />
       )}
 
@@ -300,6 +260,15 @@ export default function App() {
           error={watch.error}
           onStart={() => watch.start(profile.location, profile.language)}
           onStop={watch.stop}
+          onShowOnMap={(coords) => {
+            if (coords) setLocation(coords);
+            setMobileMap(true);
+          }}
+          onAskAdvice={(alert: WatchAlert) => {
+            handleAskPrompt(
+              `What operational precautions should my boat take regarding this coastal alert: "${alert.title}" (${alert.detail})?`,
+            );
+          }}
         />
       )}
 
@@ -310,6 +279,7 @@ export default function App() {
           onToggle={toggleLayer}
           basemap={basemap}
           onBasemapChange={setBasemap}
+          onQueryLayer={handleAskPrompt}
         />
       )}
 
@@ -341,6 +311,16 @@ export default function App() {
         hasConversation={messages.length > 0}
         onReset={startNewConversation}
         onOpenSetup={reopenSetup}
+        conditionVerdict={conditions.data?.verdict}
+        watchActive={Boolean(watch.status?.watch.active)}
+        onOpenConditions={() => {
+          setView("conditions");
+          setMobileMap(false);
+        }}
+        onOpenAlerts={() => {
+          setView("alerts");
+          setMobileMap(false);
+        }}
       />
 
       <AlertBanner alerts={bannerAlerts} minimumSeverity={bannerThreshold} />
@@ -348,14 +328,14 @@ export default function App() {
       {error && (
         <div
           role="alert"
-          className="flex shrink-0 animate-slide-up items-center gap-2 border-b border-rose-500/25 bg-rose-500/[0.07] px-4 py-2 text-[12px] band-no_go"
+          className="flex shrink-0 animate-slide-up items-center gap-2 border-b border-rose-500/25 bg-rose-500/[0.08] px-4 py-2 text-[12px] band-no_go"
         >
           <Icon name="alert" size={14} />
-          <span className="flex-1">{error}</span>
+          <span className="flex-1 font-medium">{error}</span>
           <button
             type="button"
             onClick={dismissError}
-            aria-label="Dismiss"
+            aria-label="Dismiss error notification"
             className="rounded p-1 opacity-70 hover:bg-rose-500/10 hover:opacity-100"
           >
             <Icon name="close" size={13} />
@@ -366,23 +346,20 @@ export default function App() {
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <NavRail variant="rail" {...navProps} />
 
-        {/* ── Primary panel ─────────────────────────────────────────── */}
+        {/* ── Primary Panel ─────────────────────────────────────────── */}
         <section
-          className={`min-h-0 flex-col border-slate-200 bg-white md:flex md:w-[360px] md:shrink-0 md:border-r xl:w-[392px] dark:border-white/10 dark:bg-abyss-900 ${
+          className={`min-h-0 flex-col border-sky-200/80 bg-white/95 md:flex md:w-[370px] md:shrink-0 md:border-r xl:w-[400px] dark:border-cyan-500/15 dark:bg-abyss-900/95 shadow-sm ${
             mobileMap ? "hidden" : "flex flex-1"
           }`}
         >
           {panel}
         </section>
 
-        {/* ── Map ───────────────────────────────────────────────────── */}
+        {/* ── Map Chart Room ────────────────────────────────────────── */}
         <section
           className={`relative min-h-0 flex-1 ${mobileMap ? "block" : "hidden md:block"}`}
         >
-          {/* The map is the most failure-prone thing on the page — third-party code
-              drawing third-party tiles — and the least essential to an answer being
-              readable. Its failures cost the map, not the application. */}
-          <ErrorBoundary label="The map">
+          <ErrorBoundary label="The Maritime Chart Engine">
             <MapView
               center={latest?.location ?? profile.location}
               activeLayers={activeLayers}
@@ -391,12 +368,16 @@ export default function App() {
               basemap={basemap}
               sessionId={sessionId}
               onPickPoint={setLocation}
+              onAskPrompt={handleAskPrompt}
+              onOpenConditions={() => {
+                setView("conditions");
+                setMobileMap(false);
+              }}
             />
           </ErrorBoundary>
           <MapLegend layers={activeLayers} />
 
-          {/* The insight rail overlays the map below 1280px, where there is no third
-              column to give it. */}
+          {/* Insight Rail as Sheet on smaller screens */}
           {latest && railOpen && (
             <div className="absolute inset-y-0 right-0 z-[500] w-full max-w-[380px] shadow-2xl xl:hidden">
               <InsightRail
@@ -412,14 +393,14 @@ export default function App() {
             <button
               type="button"
               onClick={() => setRailOpen(true)}
-              className="absolute right-2 top-12 z-[400] rounded-lg border border-slate-200 bg-white/90 px-2.5 py-1.5 text-[11.5px] font-semibold text-slate-700 shadow-sm backdrop-blur hover:bg-white xl:hidden dark:border-white/10 dark:bg-abyss-900/90 dark:text-slate-200"
+              className="absolute right-3 top-14 z-[400] rounded-xl border border-sky-200/80 bg-white/95 px-3 py-1.5 text-[11.5px] font-bold text-ocean-700 shadow-md backdrop-blur hover:bg-white xl:hidden dark:border-cyan-500/20 dark:bg-abyss-900/95 dark:text-cyan-300"
             >
-              Show answer
+              Show Answer Intelligence
             </button>
           )}
         </section>
 
-        {/* ── Insight rail, as a real column on wide screens ─────────── */}
+        {/* ── Insight Rail (Fixed Column on Wide Screens) ────────────── */}
         {latest && railOpen && (
           <div className="hidden xl:block">
             <InsightRail
@@ -432,16 +413,14 @@ export default function App() {
         )}
       </div>
 
-      {/* On a phone the map is a toggle rather than a tab: it belongs beside whatever
-          panel is open, not instead of the navigation. Floated clear of the tab bar and
-          the trace drawer so it never covers the map's own attribution. */}
+      {/* Floating Mobile Toggle Button */}
       <button
         type="button"
         onClick={() => setMobileMap((value) => !value)}
-        className="fixed bottom-[104px] right-3 z-[600] flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[12px] font-semibold text-slate-700 shadow-lg md:hidden dark:border-white/10 dark:bg-abyss-850 dark:text-slate-100"
+        className="fixed bottom-[104px] right-3.5 z-[600] flex items-center gap-2 rounded-full border border-ocean-500/30 bg-ocean-600 px-4 py-2.5 text-[12.5px] font-bold text-white shadow-xl md:hidden active:scale-95"
       >
-        <Icon name={mobileMap ? "chat" : "map"} size={15} />
-        {mobileMap ? "Panel" : "Map"}
+        <Icon name={mobileMap ? "chat" : "map"} size={16} />
+        {mobileMap ? "Operations Panel" : "Ocean Chart"}
       </button>
 
       <ReasoningTrace
@@ -450,8 +429,6 @@ export default function App() {
         connected={socket.connected}
       />
 
-      {/* The mobile tab bar is the last element on the page, below the trace drawer —
-          a thumb-reachable bar that something else can scroll over is not one. */}
       <NavRail variant="bar" {...navProps} />
     </div>
   );

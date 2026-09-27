@@ -1,11 +1,5 @@
 /**
- * Legend for whatever is currently drawn.
- *
- * Owner: D · Phase: P4
- *
- * Floats over the map, lists only the active layers, and collapses to a single button so
- * it never fights the map for space on a phone. A legend listing layers that are not on
- * screen is worse than none — it makes the reader hunt for something that isn't there.
+ * Legend for currently rendered chart layers.
  */
 
 import { useState } from "react";
@@ -21,62 +15,65 @@ interface Props {
 export default function MapLegend({ layers }: Props) {
   const [open, setOpen] = useState(true);
 
-  // The pin is always on and explains itself; listing it is noise.
   const shown = layers.filter((layer) => layer !== "user_pin" && LAYERS[layer]);
   if (shown.length === 0) return null;
 
   return (
-    <div className="absolute right-2 top-2 z-[400] max-w-[15rem]">
+    <div className="absolute right-3 top-3 z-[400] max-w-[16rem]">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="flex w-full items-center gap-1.5 rounded-lg border border-slate-200 bg-white/90 px-2.5 py-1.5 text-[11.5px] font-semibold text-slate-700 shadow-sm backdrop-blur transition-colors hover:bg-white dark:border-white/10 dark:bg-abyss-900/90 dark:text-slate-200 dark:hover:bg-abyss-900"
+        className="flex w-full items-center gap-2 rounded-xl border border-sky-200/90 bg-white/95 px-3 py-2 text-[12px] font-bold text-slate-800 shadow-md backdrop-blur-md transition-all hover:border-ocean-400 dark:border-cyan-500/20 dark:bg-abyss-900/95 dark:text-slate-100"
       >
-        <Icon name="layers" size={14} />
-        Legend
-        <span className="ml-auto text-[10px] font-normal muted">{shown.length}</span>
+        <Icon name="layers" size={14} className="text-ocean-600 dark:text-cyan-300" />
+        <span>Chart Legend</span>
+        <span className="ml-auto rounded-full bg-ocean-500/15 px-1.5 py-0.2 font-mono text-[9.5px] font-black text-ocean-700 dark:text-cyan-300">
+          {shown.length}
+        </span>
         <Icon
           name="chevron"
           size={12}
-          className={`text-slate-400 transition-transform ${open ? "rotate-90" : ""}`}
+          className={`text-slate-400 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
         />
       </button>
 
       {open && (
-        <ul className="mt-1 animate-fade-in space-y-1.5 rounded-lg border border-slate-200 bg-white/90 p-2.5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-abyss-900/90">
+        <ul className="mt-1.5 animate-fade-in space-y-2 rounded-2xl border border-sky-200/80 bg-white/95 p-3 shadow-lg backdrop-blur-md dark:border-cyan-500/20 dark:bg-abyss-900/95">
           {shown.map((layer) => {
             const meta = LAYERS[layer];
             const ramp = RAMPS[layer];
 
             return (
-              <li key={layer} className="flex items-start gap-2">
+              <li key={layer} className="flex items-start gap-2.5">
                 {ramp ? (
                   <span
                     aria-hidden="true"
-                    className="mt-0.5 h-3 w-5 shrink-0 rounded-sm"
+                    className="mt-0.5 h-3 w-5 shrink-0 rounded-sm shadow-sm"
                     style={{ background: `linear-gradient(90deg, ${ramp.join(", ")})` }}
                   />
                 ) : meta.shape === "line" ? (
                   <span
                     aria-hidden="true"
-                    className="mt-[7px] h-[3px] w-5 shrink-0 rounded-full"
+                    className="mt-[6px] h-[3px] w-5 shrink-0 rounded-full"
                     style={{ background: meta.swatch }}
                   />
                 ) : (
                   <span
                     aria-hidden="true"
-                    className="mt-0.5 h-3 w-5 shrink-0 rounded-sm border"
+                    className="mt-0.5 h-3 w-5 shrink-0 rounded-sm border shadow-sm"
                     style={{ background: `${meta.swatch}55`, borderColor: meta.swatch }}
                   />
                 )}
 
-                <span className="min-w-0">
-                  <span className="block text-[11px] font-medium leading-tight text-slate-800 dark:text-slate-100">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[11px] font-bold leading-tight text-slate-800 dark:text-slate-100">
                     {meta.label}
                   </span>
                   {ramp && (
-                    <span className="block text-[9.5px] leading-tight muted">low → high</span>
+                    <span className="block font-mono text-[9px] leading-tight text-ocean-700 dark:text-cyan-300">
+                      low → high gradient
+                    </span>
                   )}
                 </span>
               </li>

@@ -1,15 +1,5 @@
 /**
- * The answer rail — the current answer, in full.
- *
- * Owner: D · Phase: P4
- *
- * The conversation panel keeps a turn glanceable. This is where that turn's verdict,
- * charts and evidence get room to breathe, on the right of the map where the eye lands
- * after reading the answer.
- *
- * It appears only when there is an answer worth the space — a verdict, a chart, or
- * evidence. An empty rail permanently occupying a third of the screen is the fastest way
- * to make a layout feel unfinished.
+ * The answer rail — Deep Dive Intelligence Panel for current query.
  */
 
 import ForecastChart from "@/components/conditions/ForecastChart";
@@ -21,26 +11,18 @@ interface Props {
   response: OrcaResponse | null;
   isDark: boolean;
   onClose: () => void;
-  /** Jump to the Sources view rather than duplicating the whole evidence list here. */
   onOpenSources: () => void;
 }
 
 const INTENT_LABEL: Record<string, string> = {
-  pfz_lookup: "Fishing zones",
-  safety_check: "Safety check",
-  geofence_check: "Boundary check",
-  diagnostic: "Productivity analysis",
-  route_planning: "Route planning",
-  general: "General",
+  pfz_lookup: "Potential Fishing Zones",
+  safety_check: "Safety & Seaworthiness",
+  geofence_check: "Maritime Boundary Proximity",
+  diagnostic: "Fish Productivity & Biomass",
+  route_planning: "Passage Route Planning",
+  general: "Coastal Intelligence",
 };
 
-/**
- * The answer split into sentences, for the verdict card's reason list.
- *
- * The backend's verdict reasons are already in the answer text — the risk agent phrases
- * them into it — so re-listing them from `evidence` would say the same thing twice in two
- * different wordings. Splitting the answer keeps one voice.
- */
 function reasonsFrom(response: OrcaResponse): string[] {
   if (!response.verdict || response.verdict === "NOT_APPLICABLE") return [];
   return response.answer
@@ -58,17 +40,21 @@ export default function InsightRail({ response, isDark, onClose, onOpenSources }
   if (!hasContent) return null;
 
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col border-slate-200 bg-white xl:w-[352px] xl:border-l dark:border-white/10 dark:bg-abyss-900">
-      <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-3 dark:border-white/10">
+    <aside className="flex h-full min-h-0 w-full flex-col border-sky-200/80 bg-white/95 backdrop-blur-md xl:w-[360px] xl:border-l dark:border-cyan-500/15 dark:bg-abyss-900/95 shadow-xl">
+      {/* Header */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-sky-100 px-4 py-3 dark:border-white/10">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-bold leading-tight text-slate-900 dark:text-white">
-            This answer
-          </h2>
-          <p className="truncate text-[11px] muted">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse" />
+            <h2 className="text-[14px] font-bold leading-tight text-slate-900 dark:text-white">
+              Query Intelligence
+            </h2>
+          </div>
+          <p className="truncate text-[10.5px] muted">
             {INTENT_LABEL[response.intent] ?? response.intent}
             {response.location?.name ? ` · ${response.location.name}` : ""}
             {" · "}
-            {new Date(response.generated_at).toLocaleTimeString(undefined, {
+            {new Date(response.generated_at).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
             })}
@@ -80,13 +66,14 @@ export default function InsightRail({ response, isDark, onClose, onOpenSources }
           onClick={onClose}
           className="btn-icon ml-auto"
           aria-label="Hide the answer panel"
-          title="Hide"
+          title="Dismiss panel"
         >
-          <Icon name="close" size={15} />
+          <Icon name="close" size={14} />
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+      {/* Content */}
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3.5">
         <VerdictCard
           verdict={response.verdict}
           reasons={reasonsFrom(response)}
@@ -97,7 +84,7 @@ export default function InsightRail({ response, isDark, onClose, onOpenSources }
         {!hasVerdict && (
           <p
             lang={response.language}
-            className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[13px] leading-relaxed text-slate-800 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100"
+            className="rounded-2xl border border-sky-100 bg-sky-50/50 p-3.5 text-[13px] leading-relaxed text-slate-800 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-100"
           >
             {response.answer}
           </p>
@@ -111,20 +98,23 @@ export default function InsightRail({ response, isDark, onClose, onOpenSources }
           <button
             type="button"
             onClick={onOpenSources}
-            className="btn-ghost w-full justify-between py-2.5"
+            className="btn-ghost w-full justify-between py-2.5 hover:border-ocean-400 group"
           >
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2 text-ocean-700 dark:text-cyan-300 font-semibold text-[12px]">
               <Icon name="info" size={15} />
-              {response.evidence.length} value
-              {response.evidence.length === 1 ? "" : "s"} of evidence
+              Inspect {response.evidence.length} Sensor Citations
             </span>
-            <Icon name="arrow-right" size={14} />
+            <Icon
+              name="arrow-right"
+              size={13}
+              className="text-slate-400 group-hover:translate-x-0.5 group-hover:text-ocean-600 dark:group-hover:text-cyan-300 transition-transform"
+            />
           </button>
         )}
 
         {response.attribution.length > 0 && (
-          <p className="pt-1 text-[10.5px] leading-relaxed muted">
-            {response.attribution.join(" · ")}
+          <p className="pt-1 text-[10px] leading-relaxed muted">
+            Attribution: {response.attribution.join(" · ")}
           </p>
         )}
       </div>

@@ -1,16 +1,5 @@
 /**
- * Conditions, compressed to one card.
- *
- * Owner: D · Phase: P4
- *
- * The Ask panel opens empty — a greeting, five starters, and then a lot of nothing above
- * the composer. This fills it with the one thing the user would have asked first anyway:
- * the verdict where they are, the three readings that decided it, and when the next safe
- * window opens.
- *
- * It is a summary, not a second dashboard: three tiles and a line. Anything more and there
- * would be two places showing the same data with different amounts of it, which is how a
- * user stops believing either.
+ * Conditions glance widget — Compressed Harbour Summary for the conversation empty-state.
  */
 
 import Icon, { tileIcon } from "@/components/common/Icon";
@@ -25,13 +14,12 @@ interface Props {
 }
 
 const VERDICT: Record<Verdict, { label: string; band: string; dot: string }> = {
-  GO: { label: "Safe to go", band: "band-go", dot: "bg-emerald-500" },
-  CAUTION: { label: "Caution", band: "band-caution", dot: "bg-amber-500" },
-  NO_GO: { label: "Do not go to sea", band: "band-no_go", dot: "bg-rose-500" },
-  NOT_APPLICABLE: { label: "No assessment", band: "band-none", dot: "bg-slate-400" },
+  GO: { label: "Safe to Sail", band: "band-go", dot: "bg-emerald-500 shadow-sm shadow-emerald-500/50" },
+  CAUTION: { label: "Caution Advised", band: "band-caution", dot: "bg-amber-500 shadow-sm shadow-amber-500/50" },
+  NO_GO: { label: "Do Not Sail", band: "band-no_go", dot: "bg-rose-500 shadow-sm shadow-rose-500/50" },
+  NOT_APPLICABLE: { label: "Inland Station", band: "band-none", dot: "bg-slate-400" },
 };
 
-/** The three that decide most verdicts. Shown in this order whenever they are present. */
 const HEADLINE = ["wave_height", "wind_gusts_10m", "sea_level_height_msl"];
 
 function formatValue(value: number, unit?: string | null): string {
@@ -43,9 +31,9 @@ function formatValue(value: number, unit?: string | null): string {
 export default function ConditionsGlance({ data, loading, locationName, onOpen }: Props) {
   if (loading && !data) {
     return (
-      <div className="card p-3">
-        <div className="shimmer h-4 w-32 rounded bg-slate-200 dark:bg-white/10" />
-        <div className="shimmer mt-3 h-10 w-full rounded bg-slate-200 dark:bg-white/10" />
+      <div className="card p-3 space-y-2">
+        <div className="shimmer h-4 w-32 rounded bg-sky-200/50 dark:bg-white/10" />
+        <div className="shimmer h-12 w-full rounded-xl bg-sky-200/50 dark:bg-white/10" />
       </div>
     );
   }
@@ -63,17 +51,20 @@ export default function ConditionsGlance({ data, loading, locationName, onOpen }
     <button
       type="button"
       onClick={onOpen}
-      className="group w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition-colors hover:border-ocean-400 dark:border-white/10 dark:bg-abyss-850 dark:hover:border-ocean-500/60"
+      className="group w-full rounded-2xl border border-sky-100 bg-white/95 p-3.5 text-left transition-all hover:border-ocean-400 hover:shadow-md dark:border-white/10 dark:bg-abyss-850 dark:hover:border-cyan-400/40"
     >
       <div className="flex items-center gap-2">
-        <span aria-hidden="true" className={`h-2 w-2 rounded-full ${verdict.dot}`} />
-        <span className={`text-[12.5px] font-semibold ${verdict.band}`}>{verdict.label}</span>
-        <span className="truncate text-[11px] muted">at {locationName} right now</span>
-        <Icon
-          name="arrow-right"
-          size={13}
-          className="ml-auto shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-ocean-500 dark:text-slate-600"
-        />
+        <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${verdict.dot}`} />
+        <span className={`text-[13px] font-bold ${verdict.band}`}>{verdict.label}</span>
+        <span className="truncate text-[11px] muted font-medium">at {locationName} right now</span>
+        <span className="ml-auto flex items-center gap-1 text-[11px] font-bold text-ocean-600 dark:text-cyan-300">
+          <span>Inspect</span>
+          <Icon
+            name="arrow-right"
+            size={13}
+            className="transition-transform group-hover:translate-x-1"
+          />
+        </span>
       </div>
 
       {tiles.length > 0 && (
@@ -81,14 +72,14 @@ export default function ConditionsGlance({ data, loading, locationName, onOpen }
           {tiles.map((tile) => (
             <div
               key={tile.field}
-              className="rounded-lg bg-slate-50 px-2 py-1.5 dark:bg-white/[0.04]"
+              className="rounded-xl bg-sky-50/60 p-2 dark:bg-white/[0.04] border border-sky-100/60 dark:border-white/5"
             >
-              <span className="flex items-center gap-1 text-[10px] muted">
-                <Icon name={tileIcon(tile.icon)} size={11} />
+              <span className="flex items-center gap-1 text-[9.5px] muted font-semibold truncate">
+                <Icon name={tileIcon(tile.icon)} size={11} className="text-ocean-600 dark:text-cyan-300" />
                 <span className="truncate">{tile.label}</span>
               </span>
               <span
-                className={`mt-0.5 block text-[13px] font-bold leading-none ${
+                className={`mt-1 block font-mono text-[14px] font-black leading-none ${
                   tile.band === "none" ? "text-slate-800 dark:text-slate-100" : `band-${tile.band}`
                 }`}
               >
@@ -100,9 +91,12 @@ export default function ConditionsGlance({ data, loading, locationName, onOpen }
       )}
 
       {window && (
-        <p className="mt-2 flex items-center gap-1.5 text-[11px] muted">
-          <Icon name="clock" size={12} />
-          Next {window.quality} window {formatWindowShort(window)}
+        <p className="mt-2.5 flex items-center gap-1.5 text-[10.5px] muted font-medium border-t border-sky-100/80 pt-2 dark:border-white/10">
+          <Icon name="clock" size={12} className="text-ocean-600 dark:text-cyan-300" />
+          <span>Next {window.quality} sailing passage:</span>
+          <span className="font-semibold text-slate-800 dark:text-slate-200">
+            {formatWindowShort(window)}
+          </span>
         </p>
       )}
     </button>

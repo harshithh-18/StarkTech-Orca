@@ -36,7 +36,8 @@ export type IconName =
   | "mic" | "stop" | "send" | "search" | "gps" | "close" | "check"
   | "alert" | "clock" | "chart" | "agent" | "chevron" | "arrow-right"
   | "sun" | "moon" | "monitor" | "volume" | "refresh" | "plus" | "sparkles"
-  | "shield" | "eye" | "external";
+  | "shield" | "eye" | "external"
+  | "radar" | "crosshair" | "boat";
 
 /** Path data only — the wrapper below supplies every shared attribute. */
 const PATHS: Record<IconName, string> = {
@@ -92,6 +93,9 @@ const PATHS: Record<IconName, string> = {
   shield: "M12 22c4.7-1.1 8-4.2 8-8.5V6l-8-3.5L4 6v7.5c0 4.3 3.3 7.4 8 8.5Z",
   eye: "M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12ZM12 14.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z",
   external: "M14 4h6v6M20 4l-8.5 8.5M18 14v5a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V7.5A1.5 1.5 0 0 1 5 6h5",
+  radar: "M12 22A10 10 0 1 0 2 12M12 18a6 6 0 1 0-6-6M12 14a2 2 0 1 0-2-2M12 2v10l7 7",
+  crosshair: "M12 2v4M12 18v4M2 12h4M18 12h4M12 19a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
+  boat: "M3.5 16.5 5 21h14l1.5-4.5H3.5ZM12 4v12.5M12 4l6 4-6 3",
 };
 
 interface Props extends Omit<SVGProps<SVGSVGElement>, "name"> {

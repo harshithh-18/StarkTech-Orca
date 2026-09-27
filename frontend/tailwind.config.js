@@ -2,17 +2,12 @@
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
 
-  // Class strategy, not media: the user's explicit choice must win over the OS, and a
-  // demo laptop's OS theme is rarely the one you want on a projector.
   darkMode: "class",
 
   theme: {
     extend: {
       colors: {
-        // ── Verdict ───────────────────────────────────────────────────────
-        // The fisherman should recognise the colour before reading the word, so these
-        // stay semantic (green / amber / red) however vibrant the rest of the UI gets.
-        // `dark` variants are lifted for contrast against a navy background.
+        // ── Safety Verdict ────────────────────────────────────────────────
         verdict: {
           go: "#059669",
           "go-dark": "#34d399",
@@ -22,39 +17,51 @@ export default {
           "nogo-dark": "#f87171",
         },
 
-        // ── Ocean: the brand spine, deep navy → bright cyan ────────────────
+        // ── Ocean: deep navy → azure → bright cyan ───────────────────────
         ocean: {
-          50: "#ecfeff",
-          100: "#cffafe",
-          200: "#a5f3fc",
-          300: "#67e8f9",
-          400: "#22d3ee",
-          500: "#06b6d4",
-          600: "#0891b2",
-          700: "#0e7490",
-          800: "#155e75",
-          900: "#164e63",
-          950: "#083344",
-          // Legacy aliases so existing markup keeps working.
-          deep: "#0c2340",
-          mid: "#0891b2",
-          light: "#ecfeff",
+          50: "#f0f9ff",
+          100: "#e0f2fe",
+          200: "#bae6fd",
+          300: "#7dd3fc",
+          400: "#38bdf8",
+          500: "#0ea5e9",
+          600: "#0284c7",
+          700: "#0369a1",
+          800: "#075985",
+          900: "#0c4a6e",
+          950: "#082f49",
+          // Legacy aliases
+          deep: "#071a30",
+          mid: "#0284c7",
+          light: "#f0f9ff",
         },
 
-        // ── Abyss: dark-mode surfaces, blue-tinted rather than flat grey ───
-        // Four steps, matching the surface levels in styles/index.css. A flat grey dark
-        // mode reads as "the light theme with the lights off"; the blue tint keeps it
-        // recognisably the same product.
+        // ── Marine: seafoam & emerald (vital ocean life & productivity) ───
+        marine: {
+          50: "#f0fdfa",
+          100: "#ccfbf1",
+          200: "#99f6e4",
+          300: "#5eead4",
+          400: "#2dd4bf",
+          500: "#14b8a6",
+          600: "#0d9488",
+          700: "#0f766e",
+          800: "#115e59",
+          900: "#134e4a",
+          950: "#042f2e",
+        },
+
+        // ── Abyss: dark-mode surfaces, oceanic midnight depth ─────────────
         abyss: {
-          50: "#f8fafc",
-          700: "#1a2942",
-          800: "#111c30",
-          850: "#0d1626",
-          900: "#0a111e",
-          950: "#060b14",
+          50: "#f0f6fc",
+          700: "#172b47",
+          800: "#0e1e34",
+          850: "#0a1729",
+          900: "#06101e",
+          950: "#030813",
         },
 
-        // ── Coral: the accent that stops everything reading as blue ────────
+        // ── Coral: alerts, warmth & navigational markers ──────────────────
         coral: {
           300: "#fda4a0",
           400: "#fb7185",
@@ -62,7 +69,7 @@ export default {
           600: "#e11d48",
         },
 
-        // ── Kelp: productivity / chlorophyll ───────────────────────────────
+        // ── Kelp: chlorophyll & biological health ─────────────────────────
         kelp: {
           300: "#86efac",
           400: "#4ade80",
@@ -72,8 +79,6 @@ export default {
       },
 
       fontFamily: {
-        // Indic scripts need a fallback chain — a missing-glyph box in the middle of a
-        // Telugu answer is a demo-killer.
         sans: [
           "Inter var",
           "system-ui",
@@ -90,9 +95,6 @@ export default {
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
 
-      // ── Motion ──────────────────────────────────────────────────────────
-      // `fade-in` and `spin-slow` were referenced by the trace panel but never defined,
-      // so every "new step arrives" animation was silently a no-op.
       keyframes: {
         "fade-in": {
           "0%": { opacity: "0", transform: "translateY(4px)" },
@@ -107,9 +109,9 @@ export default {
           "100%": { opacity: "1", transform: "translateX(0)" },
         },
         "pulse-ring": {
-          "0%": { transform: "scale(0.9)", opacity: "0.7" },
-          "70%": { transform: "scale(1.6)", opacity: "0" },
-          "100%": { transform: "scale(1.6)", opacity: "0" },
+          "0%": { transform: "scale(0.9)", opacity: "0.8" },
+          "70%": { transform: "scale(1.7)", opacity: "0" },
+          "100%": { transform: "scale(1.7)", opacity: "0" },
         },
         shimmer: {
           "0%": { backgroundPosition: "-200% 0" },
@@ -119,26 +121,42 @@ export default {
           "0%, 100%": { backgroundPosition: "0% 50%" },
           "50%": { backgroundPosition: "100% 50%" },
         },
+        "radar-sweep": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
+        "wave-pulse": {
+          "0%, 100%": { transform: "translateY(0) scale(1)", opacity: "0.9" },
+          "50%": { transform: "translateY(-3px) scale(1.02)", opacity: "1" },
+        },
       },
+
       animation: {
         "fade-in": "fade-in 0.28s ease-out",
         "slide-up": "slide-up 0.32s cubic-bezier(0.22, 1, 0.36, 1)",
         "slide-in-right": "slide-in-right 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
         "spin-slow": "spin 1.6s linear infinite",
-        "pulse-ring": "pulse-ring 1.8s cubic-bezier(0.24, 0, 0.38, 1) infinite",
+        "pulse-ring": "pulse-ring 2s cubic-bezier(0.24, 0, 0.38, 1) infinite",
         shimmer: "shimmer 1.8s linear infinite",
         "gradient-drift": "gradient-drift 12s ease infinite",
+        "radar-sweep": "radar-sweep 4s linear infinite",
+        "wave-pulse": "wave-pulse 3s ease-in-out infinite",
       },
 
       boxShadow: {
-        glow: "0 0 24px -4px rgb(34 211 238 / 0.45)",
-        "glow-danger": "0 0 24px -4px rgb(248 113 113 / 0.5)",
-        card: "0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -8px rgb(8 51 68 / 0.18)",
+        glow: "0 0 20px -2px rgb(14 165 233 / 0.45)",
+        "glow-marine": "0 0 20px -2px rgb(20 184 166 / 0.45)",
+        "glow-emerald": "0 0 20px -2px rgb(16 185 129 / 0.5)",
+        "glow-danger": "0 0 20px -2px rgb(244 63 94 / 0.5)",
+        card: "0 1px 3px rgb(0 0 0 / 0.05), 0 10px 28px -10px rgb(6 24 44 / 0.15)",
+        "card-dark": "0 4px 20px -4px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.07)",
       },
 
       backgroundImage: {
-        "ocean-gradient": "linear-gradient(135deg, #083344 0%, #0e7490 50%, #06b6d4 100%)",
-        "abyss-gradient": "linear-gradient(135deg, #060b14 0%, #0d1626 55%, #164e63 100%)",
+        "ocean-gradient": "linear-gradient(135deg, #07172c 0%, #0369a1 50%, #0d9488 100%)",
+        "abyss-gradient": "linear-gradient(135deg, #030813 0%, #08162b 50%, #0f3057 100%)",
+        "marine-gradient": "linear-gradient(135deg, #0284c7 0%, #0d9488 60%, #10b981 100%)",
+        "coastal-card": "linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 249, 255, 0.85) 100%)",
       },
     },
   },

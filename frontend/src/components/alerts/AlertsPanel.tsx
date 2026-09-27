@@ -1,20 +1,5 @@
 /**
- * Proactive safety watch.
- *
- * Owner: D · Phase: P4
- *
- * Everywhere else in ORCA the user asks and the platform answers. This is the one place it
- * speaks first: arm a watch on a location and the backend re-checks it every fifteen
- * minutes, pushing anything that turned dangerous — a threshold crossed, the verdict
- * degrading, drifting within warning distance of the IMBL, the departure window closing.
- *
- * ## What the panel promises, and what it does not
- *
- * Watches live in the backend's memory (`services/watch.py`) and do not survive a server
- * restart or a closed tab. The panel says so in plain words rather than implying a
- * durability that is not there — a safety feature that quietly stops watching is worse
- * than one that never started, and "we would need Redis and a worker for that" is a
- * perfectly good thing to tell a user.
+ * Proactive Safety Watch Station — Automated Coastal Surveillance.
  */
 
 import Icon, { type IconName } from "@/components/common/Icon";
@@ -28,6 +13,10 @@ interface Props {
   error: string | null;
   onStart: () => void;
   onStop: () => void;
+  /** Action bridge to pan the map to the alert zone. */
+  onShowOnMap?: (coords?: { lat: number; lon: number }) => void;
+  /** Action bridge to Ask AI about this alert. */
+  onAskAdvice?: (alert: WatchAlert) => void;
 }
 
 const SEVERITY: Record<
@@ -36,22 +25,22 @@ const SEVERITY: Record<
 > = {
   critical: {
     icon: "alert",
-    label: "Critical",
-    ring: "border-rose-500/35 bg-rose-500/[0.07]",
+    label: "Critical Hazard",
+    ring: "border-rose-500/40 bg-gradient-to-br from-rose-500/[0.08] to-red-500/[0.03]",
     text: "band-no_go",
-    dot: "bg-rose-500",
+    dot: "bg-rose-500 shadow-sm shadow-rose-500/50",
   },
   warning: {
     icon: "alert",
-    label: "Warning",
-    ring: "border-amber-500/35 bg-amber-500/[0.07]",
+    label: "Coastal Warning",
+    ring: "border-amber-500/40 bg-gradient-to-br from-amber-500/[0.08] to-yellow-500/[0.03]",
     text: "band-caution",
-    dot: "bg-amber-500",
+    dot: "bg-amber-500 shadow-sm shadow-amber-500/50",
   },
   info: {
     icon: "info",
-    label: "Note",
-    ring: "border-slate-300 bg-slate-500/[0.05] dark:border-white/10",
+    label: "Advisory Note",
+    ring: "border-sky-200/90 bg-sky-50/40 dark:border-white/10 dark:bg-white/[0.03]",
     text: "band-none",
     dot: "bg-slate-400",
   },
@@ -61,8 +50,8 @@ function timeAgo(iso: string): string {
   const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
   if (!Number.isFinite(seconds)) return "";
   if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} min ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   return new Date(iso).toLocaleDateString();
 }
 
@@ -74,55 +63,75 @@ export default function AlertsPanel({
   error,
   onStart,
   onStop,
+  onShowOnMap,
+  onAskAdvice,
 }: Props) {
   const active = Boolean(status?.watch.active);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 border-b border-slate-200 px-4 py-3 dark:border-white/10">
-        <h2 className="text-[15px] font-bold leading-tight text-slate-900 dark:text-white">
-          Safety watch
-        </h2>
+    <div className="flex h-full min-h-0 flex-col bg-white/50 dark:bg-abyss-900/50 backdrop-blur-sm">
+      {/* Header */}
+      <div className="shrink-0 border-b border-sky-100 px-4 py-3 dark:border-white/10">
+        <div className="flex items-center gap-1.5">
+          <Icon name="radar" size={16} className="text-ocean-600 dark:text-cyan-300" />
+          <h2 className="text-[14.5px] font-bold leading-tight text-slate-900 dark:text-white">
+            Coastal Safety Watch Station
+          </h2>
+        </div>
         <p className="text-[11px] muted">
-          ORCA re-checks this location and warns you without being asked.
+          Proactive background surveillance monitoring weather limits and boundary proximity.
         </p>
       </div>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
-        {/* ── The switch ──────────────────────────────────────────────── */}
+      <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto p-3.5">
+        {/* ── Watch Station Radar Terminal ───────────────────────────── */}
         <section
-          className={`card p-3 ${active ? "border-emerald-500/35 bg-emerald-500/[0.05]" : ""}`}
+          className={`card relative overflow-hidden p-4 transition-all ${
+            active
+              ? "border-emerald-500/40 bg-gradient-to-br from-emerald-500/[0.08] via-teal-500/[0.04] to-sky-500/[0.05] dark:border-emerald-400/30"
+              : "border-sky-100"
+          }`}
         >
+          {/* Radar Scanner Animation Indicator */}
+          {active && (
+            <div className="absolute right-3 top-3 h-10 w-10 overflow-hidden rounded-full border border-emerald-500/40 bg-emerald-950/20 shadow-inner">
+              <div className="absolute inset-0 rounded-full border border-emerald-500/20" />
+              <div className="absolute inset-1.5 rounded-full border border-emerald-500/30" />
+              <div className="absolute inset-0 animate-radar-sweep bg-gradient-to-tr from-transparent via-transparent to-emerald-400/50" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+              </div>
+            </div>
+          )}
+
           <div className="flex items-start gap-3">
             <span
-              className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${
+              className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl font-bold ${
                 active
-                  ? "bg-emerald-500/15 band-go"
-                  : "bg-slate-500/10 text-slate-500 dark:text-slate-400"
+                  ? "bg-gradient-to-tr from-emerald-600 to-teal-500 text-white shadow-md shadow-emerald-500/30"
+                  : "bg-sky-100 text-ocean-700 dark:bg-white/[0.06] dark:text-slate-300"
               }`}
             >
-              <Icon name={active ? "shield" : "bell"} size={17} />
+              <Icon name={active ? "shield" : "radar"} size={18} />
             </span>
 
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-semibold text-slate-900 dark:text-slate-100">
-                {active ? "Watching" : "Watch not running"}{" "}
-                <span className="font-normal muted">
-                  · {status?.watch.location.name ?? location.name ?? "selected point"}
-                </span>
+            <div className="min-w-0 flex-1 pr-10">
+              <p className="text-[13.5px] font-bold text-slate-900 dark:text-slate-100">
+                {active ? "Surveillance Active" : "Radar Watch Inactive"}
               </p>
-              <p className="mt-0.5 text-[11.5px] leading-snug muted">
+              <p className="font-mono text-[10.5px] text-ocean-700 dark:text-cyan-300 font-semibold">
+                Station: {status?.watch.location.name ?? location.name ?? "Selected Coordinates"}
+              </p>
+              <p className="mt-1 text-[11.5px] leading-relaxed muted">
                 {active
-                  ? `Re-checked every ${Math.round(
+                  ? `Cycle: every ${Math.round(
                       (status?.watch.interval_seconds ?? 900) / 60,
-                    )} minutes. ${status?.checks ?? 0} check${
-                      (status?.checks ?? 0) === 1 ? "" : "s"
-                    } so far${
+                    )}m. Completed ${status?.checks ?? 0} automated sweeps${
                       status?.watch.last_checked_at
-                        ? `, last ${timeAgo(status.watch.last_checked_at)}`
+                        ? ` (last ${timeAgo(status.watch.last_checked_at)})`
                         : ""
                     }.`
-                  : "Arm a watch and ORCA will re-check conditions and boundary distance on a timer."}
+                  : "Arm surveillance to continuously monitor sea-state limits and maritime boundary buffers."}
               </p>
             </div>
           </div>
@@ -131,91 +140,118 @@ export default function AlertsPanel({
             type="button"
             onClick={active ? onStop : onStart}
             disabled={starting}
-            className={`mt-3 w-full ${active ? "btn-ghost" : "btn-primary"} py-2`}
+            className={`mt-3.5 w-full py-2.5 font-bold ${
+              active
+                ? "btn-ghost text-rose-600 hover:border-rose-400 hover:bg-rose-50/50 dark:text-rose-400"
+                : "btn-primary"
+            }`}
           >
             {starting ? (
               <>
-                <span className="h-3.5 w-3.5 animate-spin-slow rounded-full border-2 border-current border-t-transparent" />
-                Starting…
+                <span className="h-4 w-4 animate-spin-slow rounded-full border-2 border-current border-t-transparent" />
+                Connecting Watch Stream…
               </>
             ) : active ? (
               <>
                 <Icon name="stop" size={14} />
-                Stop watching
+                Disarm Coastal Watch
               </>
             ) : (
               <>
-                <Icon name="bell" size={14} />
-                Watch {location.name ?? "this location"}
+                <Icon name="radar" size={14} />
+                Arm Proactive Watch on {location.name ?? "Current Point"}
               </>
             )}
           </button>
 
-          {error && <p className="mt-2 text-[11.5px] leading-snug band-no_go">{error}</p>}
-
-          <p className="mt-2.5 border-t border-slate-200 pt-2 text-[10.5px] leading-relaxed muted dark:border-white/10">
-            Watches are held in the server's memory: they stop when this tab closes or the
-            backend restarts. There are no push notifications — the alert appears here and
-            on the map while ORCA is open.
-          </p>
+          {error && <p className="mt-2 text-[11px] band-no_go font-semibold">{error}</p>}
         </section>
 
-        {/* ── What it has found ───────────────────────────────────────── */}
+        {/* ── Active Watch Log ────────────────────────────────────────── */}
         <div>
-          <p className="eyebrow mb-1.5">
-            Raised {alerts.length > 0 && `· ${alerts.length}`}
-          </p>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="eyebrow flex items-center gap-1.5">
+              <Icon name="bell" size={12} />
+              Surveillance Log
+            </p>
+            {alerts.length > 0 && (
+              <span className="rounded-full bg-rose-500/15 px-2 py-0.5 font-mono text-[10px] font-bold text-rose-700 dark:text-rose-300">
+                {alerts.length} Event{alerts.length === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
 
           {alerts.length === 0 ? (
-            <div className="card grid place-items-center gap-2 px-4 py-8 text-center">
-              <Icon
-                name={active ? "eye" : "bell"}
-                size={22}
-                className="text-slate-300 dark:text-slate-600"
-              />
-              <p className="text-[12.5px] muted">
+            <div className="card grid place-items-center gap-2 p-8 text-center">
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-sky-100 dark:bg-white/5 text-ocean-600 dark:text-cyan-300">
+                <Icon name={active ? "eye" : "radar"} size={20} />
+              </span>
+              <p className="text-[12.5px] font-bold text-slate-800 dark:text-slate-200">
+                {active ? "All Monitored Parameters Normal" : "No Active Alerts"}
+              </p>
+              <p className="text-[11px] muted max-w-xs">
                 {active
-                  ? "Nothing yet. ORCA only speaks up when something changes for the worse."
-                  : "No alerts. Arm a watch to be told when conditions turn."}
+                  ? "Surveillance is running. ORCA will broadcast immediately if sea conditions deteriorate or boundaries are approached."
+                  : "Arm the surveillance watch to receive automated hazard and geofence alerts."}
               </p>
             </div>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-2.5">
               {alerts.map((alert, index) => {
                 const style = SEVERITY[alert.severity] ?? SEVERITY.info;
                 return (
                   <li
                     key={`${alert.raised_at}-${index}`}
-                    className={`animate-slide-up rounded-xl border p-3 ${style.ring}`}
+                    className={`animate-slide-up rounded-2xl border p-3.5 shadow-sm transition-all hover:scale-[1.01] ${style.ring}`}
                     style={{
                       animationDelay: `${Math.min(index, 6) * 40}ms`,
                       animationFillMode: "backwards",
                     }}
                   >
                     <div className="flex items-start gap-2.5">
-                      <Icon name={style.icon} size={16} className={`mt-px ${style.text}`} />
+                      <Icon name={style.icon} size={16} className={`mt-0.5 shrink-0 ${style.text}`} />
                       <div className="min-w-0 flex-1">
-                        <p className={`text-[13px] font-semibold leading-snug ${style.text}`}>
-                          {alert.title}
-                        </p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`text-[13px] font-bold leading-snug ${style.text}`}>
+                            {alert.title}
+                          </p>
+                          <span className="font-mono text-[10px] muted shrink-0">
+                            {timeAgo(alert.raised_at)}
+                          </span>
+                        </div>
+
                         <p className="mt-1 text-[12px] leading-relaxed text-slate-700 dark:text-slate-200">
                           {alert.detail}
                         </p>
 
-                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] muted">
-                          <span className="inline-flex items-center gap-1">
-                            <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-                            {style.label}
-                          </span>
-                          <span>·</span>
-                          <span>{timeAgo(alert.raised_at)}</span>
+                        {/* Interactive Bridges: Show on Map & Ask Advice */}
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2 pt-2 border-t border-black/[0.06] dark:border-white/10">
+                          {onShowOnMap && (
+                            <button
+                              type="button"
+                              onClick={() => onShowOnMap()}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200/80 bg-white/90 px-2 py-1 text-[10.5px] font-bold text-ocean-700 hover:bg-sky-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-cyan-300"
+                            >
+                              <Icon name="map" size={12} />
+                              Locate on Chart
+                            </button>
+                          )}
+
+                          {onAskAdvice && (
+                            <button
+                              type="button"
+                              onClick={() => onAskAdvice(alert)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-ocean-600 to-teal-600 px-2 py-1 text-[10.5px] font-bold text-white shadow-sm hover:from-ocean-500 hover:to-teal-500"
+                            >
+                              <Icon name="chat" size={12} />
+                              Ask AI Action Plan
+                            </button>
+                          )}
+
                           {alert.evidence.length > 0 && (
-                            <>
-                              <span>·</span>
-                              <span title={alert.evidence[0].source}>
-                                {alert.evidence[0].source.split("(")[0].trim()}
-                              </span>
-                            </>
+                            <span className="font-mono text-[9.5px] muted ml-auto">
+                              Source: {alert.evidence[0].source.split("(")[0].trim()}
+                            </span>
                           )}
                         </div>
                       </div>

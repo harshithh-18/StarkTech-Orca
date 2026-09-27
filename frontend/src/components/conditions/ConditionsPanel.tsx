@@ -1,16 +1,5 @@
 /**
- * The conditions dashboard — what the sea is doing, before anyone asks.
- *
- * Owner: D · Phase: P4
- *
- * The one view in ORCA that requires no question. Pick a harbour and this is already
- * true: the verdict, eight readings against their limits, the tide, the next safe
- * departure window, and the forecast curves behind all of it.
- *
- * It exists because the problem statement's own example query — *"what are the tide,
- * weather and sea conditions near my fishing location?"* — should not need a
- * conversational turn, and because an interface that shows nothing until you type
- * something has to be learned before it can be trusted.
+ * The conditions dashboard — Live Sea State, Telemetry Gauges, and Safety Windows.
  */
 
 import ConditionTile from "@/components/conditions/ConditionTile";
@@ -30,18 +19,20 @@ interface Props {
   updatedAt: Date | null;
   onRefresh: () => void;
   isDark: boolean;
-  /** Rendered under the tiles so the watch is one click from the readings it watches. */
+  /** Rendered under the tiles so the watch is one click from readings. */
   watchSlot?: React.ReactNode;
   /** Jump to the nearest harbour when this point has no sea. */
   onGoToCoast: (location: Location) => void;
+  /** Action bridge to Ask with a pre-filled maritime query. */
+  onAskPrompt?: (query: string) => void;
 }
 
 function SkeletonTile() {
   return (
     <div className="card p-3">
-      <div className="shimmer h-3 w-16 rounded bg-slate-200 dark:bg-white/10" />
-      <div className="shimmer mt-2.5 h-5 w-20 rounded bg-slate-200 dark:bg-white/10" />
-      <div className="shimmer mt-3 h-1 w-full rounded bg-slate-200 dark:bg-white/10" />
+      <div className="shimmer h-3 w-16 rounded bg-sky-200/50 dark:bg-white/10" />
+      <div className="shimmer mt-2.5 h-6 w-20 rounded bg-sky-200/50 dark:bg-white/10" />
+      <div className="shimmer mt-3 h-1.5 w-full rounded bg-sky-200/50 dark:bg-white/10" />
     </div>
   );
 }
@@ -56,23 +47,27 @@ export default function ConditionsPanel({
   isDark,
   watchSlot,
   onGoToCoast,
+  onAskPrompt,
 }: Props) {
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-white/50 dark:bg-abyss-900/50 backdrop-blur-sm">
       {/* ── Header ────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 px-4 py-3 dark:border-white/10">
+      <div className="flex shrink-0 items-center justify-between border-b border-sky-100 px-4 py-3 dark:border-white/10">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-bold leading-tight text-slate-900 dark:text-white">
-            Conditions
-          </h2>
-          <p className="truncate text-[11px] muted">
-            {location.name ?? "Selected point"} ·{" "}
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse" />
+            <h2 className="text-[14.5px] font-bold leading-tight text-slate-900 dark:text-white">
+              Sea Conditions & Nowcast
+            </h2>
+          </div>
+          <p className="truncate text-[10.5px] muted">
+            {location.name ?? "Selected Station"} ·{" "}
             {updatedAt
-              ? `updated ${updatedAt.toLocaleTimeString(undefined, {
+              ? `Sensor cycle: ${updatedAt.toLocaleTimeString(undefined, {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}`
-              : "loading…"}
+              : "Fetching telemetry…"}
           </p>
         </div>
 
@@ -80,20 +75,20 @@ export default function ConditionsPanel({
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="btn-icon ml-auto"
-          title="Refresh now"
+          className="btn-icon"
+          title="Refresh current sea readings"
           aria-label="Refresh conditions"
         >
-          <Icon name="refresh" size={15} className={loading ? "animate-spin-slow" : ""} />
+          <Icon name="refresh" size={15} className={loading ? "animate-spin-slow text-ocean-600" : ""} />
         </button>
       </div>
 
       {/* ── Body ──────────────────────────────────────────────────────── */}
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+      <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto p-3.5">
         {error && (
-          <div className="rounded-xl border border-rose-500/30 bg-rose-500/[0.07] p-3">
-            <p className="flex items-start gap-2 text-[12.5px] leading-snug band-no_go">
-              <Icon name="alert" size={15} className="mt-px" />
+          <div className="rounded-2xl border border-rose-500/30 bg-rose-500/[0.08] p-3 shadow-sm">
+            <p className="flex items-start gap-2 text-[12px] leading-snug band-no_go">
+              <Icon name="alert" size={15} className="mt-px shrink-0" />
               <span>{error}</span>
             </p>
           </div>
@@ -101,7 +96,7 @@ export default function ConditionsPanel({
 
         {!data && loading && (
           <>
-            <div className="shimmer h-24 rounded-xl bg-slate-200 dark:bg-white/10" />
+            <div className="shimmer h-28 rounded-2xl bg-sky-200/40 dark:bg-white/10" />
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {Array.from({ length: 6 }, (_, index) => (
                 <SkeletonTile key={index} />
@@ -112,6 +107,7 @@ export default function ConditionsPanel({
 
         {data && (
           <>
+            {/* Safety Verdict Beacon */}
             {data.coastal ? (
               <VerdictCard
                 verdict={data.verdict}
@@ -128,34 +124,66 @@ export default function ConditionsPanel({
               />
             )}
 
+            {/* Cross-page Connection: Ask About Conditions Action */}
+            {onAskPrompt && data.coastal && (
+              <button
+                type="button"
+                onClick={() =>
+                  onAskPrompt(
+                    `Based on current conditions at ${location.name ?? "my location"} (verdict: ${data.verdict}), is it safe for small craft to sail today? What precautions are needed?`,
+                  )
+                }
+                className="group flex w-full items-center justify-between rounded-xl border border-sky-200/90 bg-gradient-to-r from-sky-50 via-teal-50/50 to-white p-2.5 text-left transition-all hover:border-ocean-400 hover:shadow-sm dark:border-white/10 dark:from-abyss-850 dark:to-ocean-950/40"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="grid h-6 w-6 place-items-center rounded-lg bg-ocean-500/15 text-ocean-700 dark:text-cyan-300">
+                    <Icon name="chat" size={13} />
+                  </span>
+                  <span className="text-[12px] font-bold text-ocean-900 dark:text-cyan-100">
+                    Ask ORCA to analyze these conditions
+                  </span>
+                </div>
+                <Icon
+                  name="arrow-right"
+                  size={13}
+                  className="text-ocean-600 dark:text-cyan-300 transition-transform group-hover:translate-x-1"
+                />
+              </button>
+            )}
+
             {data.coastal && data.degraded.length > 0 && (
-              // We degrade honestly. A missing model costs the user some tiles, and the
-              // panel says which ones and why rather than quietly showing fewer.
-              <div className="rounded-lg border border-amber-500/30 bg-amber-500/[0.07] px-3 py-2">
-                <p className="text-[11.5px] leading-snug band-caution">
-                  Partial data —{" "}
-                  {data.degraded.join("; ")}. Everything below is from the models that did
-                  answer.
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.08] px-3 py-2">
+                <p className="text-[11px] leading-snug band-caution">
+                  Sensor notice: {data.degraded.join("; ")}. Displaying live telemetry from active feeds.
                 </p>
               </div>
             )}
 
+            {/* Telemetry Tiles */}
             <div>
-              <p className="eyebrow mb-1.5">
-                {data.coastal ? "Right now" : `Weather at ${location.name ?? "this point"}`}
+              <p className="eyebrow mb-1.5 flex items-center gap-1.5">
+                <Icon name="gauge" size={12} />
+                {data.coastal ? "Atmospheric & Marine Readings" : `Weather at ${location.name ?? "this point"}`}
               </p>
-              {/* Three columns only while the panel is full-width (phone landscape and
-                  small tablets). From `md` the panel is a fixed 360–392 px column, and
-                  three tiles in it would clip the values. */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-2">
                 {data.tiles.map((tile) => (
-                  <ConditionTile key={tile.field} tile={tile} />
+                  <ConditionTile
+                    key={tile.field}
+                    tile={tile}
+                    onAsk={
+                      onAskPrompt
+                        ? () =>
+                            onAskPrompt(
+                              `Explain the current ${tile.label} reading of ${tile.value} ${tile.unit ?? ""} at ${location.name ?? "my location"} and what risks it poses for small craft.`,
+                            )
+                        : undefined
+                    }
+                  />
                 ))}
               </div>
             </div>
 
-            {/* A safety watch, a departure window and a tide table are all statements
-                about a sea that is not there. Shown only for a coastal point. */}
+            {/* Coastal Specific Modules */}
             {data.coastal && (
               <>
                 {watchSlot}
@@ -170,17 +198,21 @@ export default function ConditionsPanel({
               </>
             )}
 
+            {/* Forecast Curves */}
             {data.charts.length > 0 && (
-              <div className="space-y-2">
-                <p className="eyebrow">Forecast</p>
+              <div className="space-y-2.5 pt-1">
+                <p className="eyebrow flex items-center gap-1.5">
+                  <Icon name="chart" size={12} />
+                  48-Hour Wave & Wind Forecast Curves
+                </p>
                 {data.charts.map((chart) => (
                   <ForecastChart key={chart.id} spec={chart} isDark={isDark} />
                 ))}
               </div>
             )}
 
-            <p className="pt-1 text-[10.5px] leading-relaxed muted">
-              {data.attribution.join(" · ")}
+            <p className="pt-1 text-[10px] leading-relaxed muted">
+              Attribution: {data.attribution.join(" · ")}
             </p>
           </>
         )}

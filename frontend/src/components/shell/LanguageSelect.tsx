@@ -1,15 +1,5 @@
 /**
- * Reply-language control.
- *
- * Owner: F (with D) · Phase: P4 (replaces the P2 stub)
- *
- * Auto-detect is the default and the top entry, because detecting the language of the
- * query and answering in it is the behaviour the platform is built around — this control
- * is the override, not the primary path.
- *
- * Every language is written in **its own script**. A Tamil speaker scanning a list of
- * English names has to translate before they can choose, which defeats the point of
- * offering their language at all.
+ * Reply-language control — Indian Coastal Languages & Auto-Detect.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -55,19 +45,19 @@ export default function LanguageSelect({ value, auto = false, onChange }: Props)
         aria-haspopup="menu"
         title={
           auto
-            ? "Answers come back in whatever language you ask in"
-            : `Answers are forced to ${current.english}`
+            ? "Auto-Detect: Answers match whatever language you ask in"
+            : `Answers are pinned to ${current.english}`
         }
-        className="btn-ghost px-2.5 py-1.5"
+        className="btn-ghost px-2.5 py-1.5 flex items-center gap-1.5"
       >
-        <span className="text-[13px] font-semibold">
+        <span className="text-[12px] font-bold text-ocean-700 dark:text-cyan-300">
           {auto ? "Auto" : current.label}
         </span>
         <Icon
           name="chevron"
-          size={13}
+          size={12}
           className={`text-slate-400 transition-transform duration-200 ${
-            open ? "rotate-90" : ""
+            open ? "rotate-90 text-ocean-600 dark:text-cyan-300" : ""
           }`}
         />
       </button>
@@ -75,8 +65,9 @@ export default function LanguageSelect({ value, auto = false, onChange }: Props)
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+6px)] z-50 w-60 animate-slide-up overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-white/10 dark:bg-abyss-850"
+          className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 animate-slide-up overflow-hidden rounded-2xl border border-sky-200 bg-white/98 py-1.5 shadow-2xl backdrop-blur-md dark:border-cyan-500/20 dark:bg-abyss-850/98"
         >
+          {/* Auto-detect button */}
           <button
             type="button"
             role="menuitemradio"
@@ -85,30 +76,36 @@ export default function LanguageSelect({ value, auto = false, onChange }: Props)
               onChange(null);
               setOpen(false);
             }}
-            className="flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+            className={`flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors ${
+              auto
+                ? "bg-ocean-500/10 dark:bg-ocean-400/10 text-ocean-900 dark:text-cyan-200"
+                : "hover:bg-sky-50 dark:hover:bg-white/5"
+            }`}
           >
-            <Icon
-              name="sparkles"
-              size={15}
-              className="mt-0.5 text-ocean-600 dark:text-ocean-300"
-            />
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ocean-500/15 text-ocean-600 dark:text-cyan-300">
+              <Icon name="sparkles" size={15} />
+            </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium text-slate-900 dark:text-slate-100">
-                Auto-detect
+              <span className="block text-[12.5px] font-bold text-slate-900 dark:text-slate-100">
+                Auto-Detect Language
               </span>
-              <span className="block text-[11px] leading-snug muted">
-                Ask in any language; the answer comes back in the same one.
+              <span className="block text-[10.5px] leading-snug muted">
+                Detects input script & answers in the same Indic tongue.
               </span>
             </span>
             {auto && (
-              <Icon name="check" size={14} className="mt-0.5 text-ocean-600 dark:text-ocean-300" />
+              <span className="rounded-full bg-marine-500/20 p-0.5 text-marine-700 dark:text-marine-300">
+                <Icon name="check" size={13} />
+              </span>
             )}
           </button>
 
-          <div className="my-1 h-px bg-slate-200 dark:bg-white/10" />
-          <p className="eyebrow px-3 pb-1">Always answer in</p>
+          <div className="my-1.5 h-px bg-sky-100 dark:bg-white/10" />
+          <p className="eyebrow px-3 pb-1 text-[10px] text-ocean-700 dark:text-ocean-300">
+            Pin Reply Language
+          </p>
 
-          <div className="max-h-64 overflow-y-auto">
+          <div className="max-h-64 overflow-y-auto py-0.5">
             {LANGUAGES.map((language) => {
               const selected = !auto && language.code === value;
               return (
@@ -121,14 +118,20 @@ export default function LanguageSelect({ value, auto = false, onChange }: Props)
                     onChange(language.code);
                     setOpen(false);
                   }}
-                  className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
+                  className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors ${
+                    selected
+                      ? "bg-ocean-500/10 dark:bg-ocean-400/10 font-bold"
+                      : "hover:bg-sky-50 dark:hover:bg-white/5"
+                  }`}
                 >
-                  <span className="w-24 shrink-0 text-[13px] font-medium text-slate-900 dark:text-slate-100">
+                  <span className="w-24 shrink-0 text-[13px] font-semibold text-slate-900 dark:text-slate-100">
                     {language.label}
                   </span>
                   <span className="flex-1 truncate text-[11px] muted">{language.english}</span>
                   {selected && (
-                    <Icon name="check" size={14} className="text-ocean-600 dark:text-ocean-300" />
+                    <span className="rounded-full bg-marine-500/20 p-0.5 text-marine-700 dark:text-marine-300">
+                      <Icon name="check" size={13} />
+                    </span>
                   )}
                 </button>
               );

@@ -1,15 +1,5 @@
 /**
- * One turn in the conversation.
- *
- * Owner: D · Phase: P1 · Rebuilt P4
- *
- * An ORCA turn is not just text: it carries the verdict, the evidence behind it, and a
- * button to hear it read aloud. The bubble stays glanceable and the numbers live behind
- * a disclosure — the detail belongs in the insight rail, not stacked in the chat.
- *
- * `lang` is set from the response so the browser shapes and line-breaks Indic scripts
- * correctly. Without it Telugu and Tamil can break mid-cluster, which looks like mojibake
- * and is entirely our fault.
+ * One turn in the conversation — Structured Maritime Response Bubble.
  */
 
 import { useState } from "react";
@@ -28,11 +18,23 @@ interface Props {
 
 const VERDICT: Record<
   Exclude<Verdict, "NOT_APPLICABLE">,
-  { text: string; className: string }
+  { text: string; className: string; icon: "check" | "alert" | "close" }
 > = {
-  GO: { text: "Safe to go", className: "bg-emerald-500 text-white" },
-  CAUTION: { text: "Caution", className: "bg-amber-500 text-white" },
-  NO_GO: { text: "Do not go to sea", className: "bg-rose-600 text-white" },
+  GO: {
+    text: "Safe to Sail",
+    className: "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30",
+    icon: "check",
+  },
+  CAUTION: {
+    text: "Caution Advisory",
+    className: "bg-amber-500 text-white shadow-sm shadow-amber-500/30",
+    icon: "alert",
+  },
+  NO_GO: {
+    text: "Do Not Go To Sea",
+    className: "bg-rose-600 text-white shadow-sm shadow-rose-600/30",
+    icon: "close",
+  },
 };
 
 export default function MessageBubble({ message, onRetry, onSpeak, speaking }: Props) {
@@ -47,9 +49,9 @@ export default function MessageBubble({ message, onRetry, onSpeak, speaking }: P
   if (isUser) {
     return (
       <div className="flex animate-slide-up justify-end">
-        <p className="max-w-[85%] rounded-2xl rounded-br-md bg-ocean-600 px-3.5 py-2 text-[13.5px] leading-relaxed text-white dark:bg-ocean-600">
+        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-gradient-to-r from-ocean-700 via-ocean-600 to-teal-600 px-4 py-2.5 text-[13.5px] font-medium leading-relaxed text-white shadow-md">
           {message.text}
-        </p>
+        </div>
       </div>
     );
   }
@@ -59,47 +61,56 @@ export default function MessageBubble({ message, onRetry, onSpeak, speaking }: P
       {message.failed ? (
         <span
           aria-hidden="true"
-          className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-rose-500/10 band-no_go"
+          className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-xl bg-rose-500/10 band-no_go"
         >
           <Icon name="alert" size={15} />
         </span>
       ) : (
-        <Logo size={28} className="mt-0.5" />
+        <Logo size={30} rounded="rounded-xl" className="mt-0.5 shadow-sm ring-1 ring-cyan-500/30" />
       )}
 
       <div
-        className={`min-w-0 max-w-[calc(100%-2.5rem)] rounded-2xl rounded-tl-md border px-3.5 py-2.5 ${
+        className={`min-w-0 max-w-[calc(100%-2.5rem)] rounded-2xl rounded-tl-sm border px-4 py-3 shadow-sm ${
           message.failed
             ? "border-rose-500/30 bg-rose-500/[0.06]"
-            : "border-slate-200 bg-white dark:border-white/10 dark:bg-abyss-850"
+            : "border-sky-100 bg-white/95 dark:border-white/10 dark:bg-abyss-850/95"
         }`}
         lang={response?.language ?? undefined}
       >
         {message.pending ? (
-          <span className="flex items-center gap-1.5 py-1" aria-label="ORCA is thinking">
-            {[0, 150, 300].map((delay) => (
-              <span
-                key={delay}
-                className="h-1.5 w-1.5 animate-bounce rounded-full bg-ocean-400"
-                style={{ animationDelay: `${delay}ms` }}
-              />
-            ))}
-          </span>
+          <div className="flex items-center gap-2 py-1 text-ocean-600 dark:text-cyan-300" aria-label="ORCA is reasoning">
+            <span className="flex items-center gap-1">
+              {[0, 150, 300].map((delay) => (
+                <span
+                  key={delay}
+                  className="h-2 w-2 animate-bounce rounded-full bg-current"
+                  style={{ animationDelay: `${delay}ms` }}
+                />
+              ))}
+            </span>
+            <span className="text-[11.5px] font-semibold">Specialist agents synthesizing telemetry…</span>
+          </div>
         ) : (
           <>
             {verdict && (
-              <span
-                className={`mb-2 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-bold ${verdict.className}`}
-              >
-                {verdict.text}
-              </span>
+              <div className="mb-2 flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-black tracking-wide ${verdict.className}`}
+                >
+                  <Icon name={verdict.icon} size={12} />
+                  {verdict.text}
+                </span>
+                {response?.intent && (
+                  <span className="text-[10px] font-mono uppercase tracking-wider muted">
+                    {response.intent.replace("_", " ")}
+                  </span>
+                )}
+              </div>
             )}
 
             <p
-              className={`whitespace-pre-wrap text-[13.5px] leading-relaxed ${
-                message.failed
-                  ? "band-no_go"
-                  : "text-slate-800 dark:text-slate-100"
+              className={`whitespace-pre-wrap text-[13.5px] leading-relaxed font-normal ${
+                message.failed ? "band-no_go font-medium" : "text-slate-800 dark:text-slate-100"
               }`}
             >
               {message.text}
@@ -109,23 +120,23 @@ export default function MessageBubble({ message, onRetry, onSpeak, speaking }: P
               <button
                 type="button"
                 onClick={() => onRetry(message.id)}
-                className="btn-ghost mt-2.5 px-2.5 py-1"
+                className="btn-ghost mt-2.5 px-3 py-1 text-rose-600 dark:text-rose-300"
               >
                 <Icon name="refresh" size={13} />
-                Try again
+                Retry Question
               </button>
             )}
 
             {response && (
-              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-200 pt-2 dark:border-white/10">
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-sky-100 pt-2.5 dark:border-white/10">
                 {onSpeak && (
                   <button
                     type="button"
                     onClick={() => onSpeak(message)}
-                    className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-ocean-600 transition-colors hover:text-ocean-500 dark:text-ocean-300"
+                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-bold text-ocean-700 hover:bg-ocean-50 dark:text-cyan-300 dark:hover:bg-white/5 transition-colors"
                   >
                     <Icon name={speaking ? "stop" : "volume"} size={13} />
-                    {speaking ? "Stop" : "Listen"}
+                    {speaking ? "Stop Broadcast" : "Read Aloud"}
                   </button>
                 )}
 
@@ -134,44 +145,45 @@ export default function MessageBubble({ message, onRetry, onSpeak, speaking }: P
                     type="button"
                     onClick={() => setShowEvidence((value) => !value)}
                     aria-expanded={showEvidence}
-                    className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-ocean-600 transition-colors hover:text-ocean-500 dark:text-ocean-300"
+                    className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-bold text-ocean-700 hover:bg-ocean-50 dark:text-cyan-300 dark:hover:bg-white/5 transition-colors"
                   >
                     <Icon
                       name="chevron"
-                      size={12}
-                      className={`transition-transform ${showEvidence ? "rotate-90" : ""}`}
+                      size={11}
+                      className={`transition-transform duration-200 ${showEvidence ? "rotate-90 text-ocean-600" : ""}`}
                     />
-                    {showEvidence ? "Hide evidence" : `Evidence (${response.evidence.length})`}
+                    {showEvidence ? "Hide Evidence" : `Evidence Citations (${response.evidence.length})`}
                   </button>
                 )}
 
                 {response.used_mock_data && (
-                  <span className="chip bg-amber-500/15 text-amber-700 dark:text-amber-300">
-                    Demo data
+                  <span className="chip bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[10px] py-0.5">
+                    Cached Fallback
                   </span>
                 )}
               </div>
             )}
 
+            {/* Evidence Drawer */}
             {showEvidence && response && (
-              <dl className="mt-2 animate-fade-in space-y-2">
+              <dl className="mt-2.5 animate-fade-in space-y-1.5 rounded-xl bg-sky-50/60 p-2.5 dark:bg-abyss-950/60 border border-sky-100 dark:border-white/5">
                 {response.evidence.map((item, index) => (
                   <div
                     key={`${item.field}-${index}`}
-                    className="rounded-lg bg-slate-50 px-2.5 py-1.5 dark:bg-white/[0.04]"
+                    className="rounded-lg bg-white px-2.5 py-1.5 dark:bg-abyss-850 border border-sky-100/70 dark:border-white/5"
                   >
                     <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-                      <dt className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200">
+                      <dt className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
                         {fieldLabel(item.field)}
                       </dt>
-                      <dd className="font-mono text-[11.5px] font-semibold text-ocean-700 dark:text-ocean-300">
+                      <dd className="font-mono text-[11.5px] font-black text-ocean-700 dark:text-cyan-300">
                         {String(item.value)}
                         {item.unit ? ` ${item.unit}` : ""}
                       </dd>
                     </div>
-                    <dd className="mt-0.5 text-[10.5px] leading-snug muted">
+                    <dd className="mt-0.5 font-mono text-[9.5px] leading-snug muted">
                       {item.source}
-                      {item.time && ` · ${new Date(item.time).toLocaleString()}`}
+                      {item.time && ` · ${new Date(item.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}
                     </dd>
                   </div>
                 ))}

@@ -1,18 +1,5 @@
 /**
- * The conversation.
- *
- * Owner: D · Phase: P1 · Rebuilt P4
- *
- * Multi-turn, multilingual, voice-capable. The composer accepts any script — there is no
- * Latin-only validation anywhere near this box, and there must never be.
- *
- * ## Starters are per role
- *
- * A fisher, a coastal authority, a researcher and a shipping operator ask genuinely
- * different questions of the same data. Showing all four sets at once is how a first-time
- * user concludes the tool is not for them; showing the four that match who they said they
- * were is how they get a useful answer on their first try. The role comes from the
- * welcome screen and is changeable at any time.
+ * The conversation — Multilingual Maritime Reasoning & Query Console.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -28,7 +15,6 @@ interface Props {
   role: Role;
   locationName: string;
   onAsk: (query: string) => void;
-  /** The live now-cast, summarised above the starters so the panel opens with a fact. */
   conditions: ConditionsSnapshot | null;
   conditionsLoading: boolean;
   onOpenConditions: () => void;
@@ -49,104 +35,109 @@ interface Starter {
   query: string;
 }
 
-/** The golden path, split by who is asking. Every one of these answers end to end. */
 const STARTERS: Record<Role, Starter[]> = {
   fisherman: [
     {
       icon: "fish",
-      label: "Nearest fishing zone",
+      label: "Potential Fishing Zones",
       query: "Where is the nearest Potential Fishing Zone today?",
     },
     {
       icon: "anchor",
-      label: "Is it safe to sail tomorrow?",
+      label: "Tomorrow Morning Sailing Safety",
       query: "Is it safe to go to sea tomorrow morning?",
     },
     {
       icon: "tide",
-      label: "Tide, wind and sea state",
+      label: "Sea State, Tides & Wave Swell",
       query: "What are the tide, weather and sea conditions near my location?",
     },
     {
       icon: "boundary",
-      label: "Am I near a boundary?",
-      query: "Am I approaching any restricted maritime boundary?",
+      label: "Maritime Boundary Distance",
+      query: "Am I approaching any restricted maritime boundary or IMBL?",
     },
   ],
   authority: [
     {
       icon: "boundary",
-      label: "Boundary proximity",
+      label: "Border & IMBL Proximity Check",
       query: "Am I approaching any restricted maritime boundary?",
     },
     {
       icon: "storm",
-      label: "Hazard advisories",
+      label: "Cyclone & Lightning Advisories",
       query: "Are there any lightning or cyclone alerts in my area?",
     },
     {
       icon: "shield",
-      label: "Zones to avoid",
+      label: "Hazardous Coastal Sectors",
       query: "Which fishing zones should be avoided due to hazardous marine conditions?",
     },
     {
       icon: "anchor",
-      label: "Small-craft safety",
+      label: "Small Craft Advisory Limits",
       query: "Is it safe for small craft to venture out tomorrow morning?",
     },
   ],
   researcher: [
     {
       icon: "chart",
-      label: "Why productivity fell",
+      label: "Chlorophyll & Biomass Analysis",
       query: "Why has fish productivity declined in this region?",
     },
     {
       icon: "front",
-      label: "Chlorophyll and SST",
+      label: "Thermal Fronts & Eddies",
       query: "Which regions show high chlorophyll concentration and favourable sea surface temperature?",
     },
     {
       icon: "temperature",
-      label: "Thermal fronts",
+      label: "SST Gradients & Upwelling",
       query: "Are there any thermal fronts or eddies near this location?",
     },
     {
       icon: "fish",
-      label: "Fishing zones today",
+      label: "Computed Zone Coordinates",
       query: "Where is the nearest Potential Fishing Zone today?",
     },
   ],
   operator: [
     {
       icon: "route",
-      label: "Safest route",
+      label: "Least-Risk Coastal Route",
       query: "What is the safest route from Kakinada to Chennai?",
     },
     {
       icon: "wave",
-      label: "Sea state on passage",
+      label: "Passage Swell & Wave Height",
       query: "What is the sea state and swell along the coast over the next two days?",
     },
     {
       icon: "storm",
-      label: "Hazards en route",
+      label: "En-Route Hazards & Squalls",
       query: "Are there any cyclone or high-wave hazards on this coast?",
     },
     {
       icon: "boundary",
-      label: "Restricted waters",
+      label: "Navigational Restrictions",
       query: "Which waters near here are restricted or protected?",
     },
   ],
 };
 
-/** One multilingual example, always shown — it is how a user learns they may switch. */
-const MULTILINGUAL: Starter = {
-  icon: "sparkles",
-  label: "తెలుగులో అడగండి",
-  query: "రేపు సముద్రంలోకి వెళ్ళడం సురక్షితమేనా?",
-};
+const MULTILINGUAL_STARTERS: Starter[] = [
+  {
+    icon: "sparkles",
+    label: "తెలుగు (Telugu)",
+    query: "రేపు సముద్రంలోకి వెళ్ళడం సురక్షితమేనా?",
+  },
+  {
+    icon: "sparkles",
+    label: "தமிழ் (Tamil)",
+    query: "இன்று மீன்பிடி மண்டலம் எங்கே உள்ளது?",
+  },
+];
 
 export default function ConversationPanel({
   messages,
@@ -170,12 +161,11 @@ export default function ConversationPanel({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
-  // Grow the box with the text, up to a cap — a fixed single line hides long Indic input.
   useEffect(() => {
     const node = inputRef.current;
     if (!node) return;
     node.style.height = "auto";
-    node.style.height = `${Math.min(node.scrollHeight, 132)}px`;
+    node.style.height = `${Math.min(node.scrollHeight, 120)}px`;
   }, [draft]);
 
   const submit = () => {
@@ -185,29 +175,40 @@ export default function ConversationPanel({
     setDraft("");
   };
 
-  const starters = [...STARTERS[role], MULTILINGUAL];
+  const starters = [...STARTERS[role], ...MULTILINGUAL_STARTERS];
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-white/60 dark:bg-abyss-900/60 backdrop-blur-sm">
+      {/* ── Chat Messages Scroll Area ─────────────────────────────────── */}
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
         {messages.length === 0 ? (
           <div className="animate-fade-in space-y-4">
-            <div className="rounded-xl border border-ocean-500/20 bg-ocean-500/[0.06] p-3.5">
-              <p className="text-[13.5px] font-semibold text-slate-900 dark:text-white">
-                Ask about the sea — in any Indian language.
-              </p>
-              <p className="mt-1 text-[12px] leading-relaxed muted">
-                Questions are answered for{" "}
-                <span className="font-medium text-slate-700 dark:text-slate-200">
+            {/* Operational Briefing Card */}
+            <div className="card-ocean p-4 relative overflow-hidden">
+              <div className="flex items-center gap-2">
+                <span className="grid h-6 w-6 place-items-center rounded-lg bg-ocean-500/20 text-ocean-700 dark:text-cyan-300">
+                  <Icon name="compass" size={14} />
+                </span>
+                <p className="text-[13px] font-bold text-slate-900 dark:text-white">
+                  Coastal Operations Briefing
+                </p>
+                <span className="ml-auto font-mono text-[10px] text-ocean-700 dark:text-cyan-300 font-semibold">
                   {locationName}
-                </span>{" "}
-                unless you name somewhere else. Every answer shows the agents that ran and
-                the evidence behind it.
+                </span>
+              </div>
+              <p className="mt-2 text-[12px] leading-relaxed muted">
+                Pose maritime questions in any Indian coastal language. ORCA plans and runs specialist
+                meteorological, oceanographic, and geospatial agents in parallel, returning verified verdicts
+                with full sensor citations.
               </p>
             </div>
 
+            {/* Conditions Glance */}
             <div>
-              <p className="eyebrow mb-1.5">Right now</p>
+              <p className="eyebrow mb-1.5 flex items-center gap-1.5">
+                <Icon name="gauge" size={12} />
+                Live Harbour Telemetry
+              </p>
               <ConditionsGlance
                 data={conditions}
                 loading={conditionsLoading}
@@ -216,8 +217,12 @@ export default function ConversationPanel({
               />
             </div>
 
+            {/* Quick Starters */}
             <div>
-              <p className="eyebrow mb-1.5">Try one</p>
+              <p className="eyebrow mb-1.5 flex items-center gap-1.5">
+                <Icon name="sparkles" size={12} />
+                Suggested Mission Queries
+              </p>
               <div className="space-y-1.5">
                 {starters.map((starter, index) => (
                   <button
@@ -225,26 +230,24 @@ export default function ConversationPanel({
                     type="button"
                     onClick={() => onAsk(starter.query)}
                     style={{
-                      animationDelay: `${index * 45}ms`,
+                      animationDelay: `${index * 40}ms`,
                       animationFillMode: "backwards",
                     }}
-                    className="group flex w-full animate-slide-up items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left transition-all hover:border-ocean-400 hover:bg-ocean-500/[0.04] dark:border-white/10 dark:bg-abyss-850 dark:hover:border-ocean-500/60"
+                    className="group flex w-full animate-slide-up items-center gap-2.5 rounded-xl border border-sky-100 bg-white/90 px-3 py-2.5 text-left transition-all hover:border-ocean-400 hover:bg-ocean-50/50 hover:shadow-sm dark:border-white/10 dark:bg-abyss-850 dark:hover:border-cyan-400/40 dark:hover:bg-ocean-950/40"
                   >
-                    <Icon
-                      name={starter.icon}
-                      size={16}
-                      className="text-ocean-600 dark:text-ocean-300"
-                    />
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-tr from-ocean-500/15 to-marine-500/15 text-ocean-700 dark:text-cyan-300 group-hover:scale-105 transition-transform">
+                      <Icon name={starter.icon} size={15} />
+                    </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[12.5px] font-semibold text-slate-900 dark:text-slate-100">
+                      <span className="block truncate text-[12.5px] font-bold text-slate-900 dark:text-slate-100">
                         {starter.label}
                       </span>
                       <span className="block truncate text-[11px] muted">{starter.query}</span>
                     </span>
                     <Icon
                       name="arrow-right"
-                      size={14}
-                      className="text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-ocean-500 dark:text-slate-600"
+                      size={13}
+                      className="text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-ocean-600 dark:text-slate-600 dark:group-hover:text-cyan-400"
                     />
                   </button>
                 ))}
@@ -265,74 +268,77 @@ export default function ConversationPanel({
         <div ref={endRef} />
       </div>
 
-      {/* ── Composer ──────────────────────────────────────────────────── */}
-      <div className="shrink-0 border-t border-slate-200 p-3 dark:border-white/10">
+      {/* ── Floating Composer Dock ───────────────────────────────────── */}
+      <div className="shrink-0 border-t border-sky-100 bg-white/80 p-3 backdrop-blur-md dark:border-white/10 dark:bg-abyss-900/80">
         <div className="flex items-end gap-2">
-          <textarea
-            id="orca-input"
-            ref={inputRef}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              // Enter sends, Shift+Enter makes a newline. IME composition must not be
-              // interrupted — Indic and CJK input both commit text with Enter.
-              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                submit();
-              }
-            }}
-            rows={1}
-            placeholder="Ask ORCA…"
-            aria-label="Ask ORCA a question"
-            className="input resize-none py-2.5 text-[13.5px]"
-          />
+          <div className="relative flex-1">
+            <textarea
+              id="orca-input"
+              ref={inputRef}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  submit();
+                }
+              }}
+              rows={1}
+              placeholder={`Ask ORCA about sea state, fish zones, or boundaries…`}
+              aria-label="Ask ORCA a maritime question"
+              className="input resize-none py-2.5 text-[13px] pr-2 shadow-inner"
+            />
+          </div>
 
+          {/* Voice Input Button */}
           {voice?.supported && (
             <button
               type="button"
               onClick={() => (voice.listening ? voice.stopListening() : voice.listen())}
               disabled={loading}
-              aria-label={voice.listening ? "Stop listening" : "Ask by voice"}
+              aria-label={voice.listening ? "Stop voice listening" : "Ask by voice"}
               aria-pressed={voice.listening}
               title={
                 voice.listening
-                  ? "Listening — click to stop"
-                  : "Ask by voice, in your own language"
+                  ? "Listening to voice… click to send"
+                  : "Speak query in any Indian coastal tongue"
               }
-              className={`btn relative h-[38px] w-[38px] shrink-0 border ${
+              className={`btn relative h-[38px] w-[38px] shrink-0 rounded-xl border transition-all ${
                 voice.listening
-                  ? "border-rose-500 bg-rose-500 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08]"
+                  ? "border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-500/30 scale-105"
+                  : "border-sky-200 bg-white text-ocean-700 hover:bg-ocean-50 hover:border-ocean-400 dark:border-white/10 dark:bg-abyss-850 dark:text-cyan-300 dark:hover:bg-white/[0.08]"
               }`}
             >
               {voice.listening && (
                 <span
                   aria-hidden="true"
-                  className="absolute inset-0 animate-pulse-ring rounded-lg bg-rose-400"
+                  className="absolute inset-0 animate-pulse-ring rounded-xl bg-rose-400/50"
                 />
               )}
-              <Icon name={voice.listening ? "stop" : "mic"} size={16} className="relative" />
+              <Icon name={voice.listening ? "stop" : "mic"} size={16} className="relative z-10" />
             </button>
           )}
 
+          {/* Submit Button */}
           <button
             type="button"
             onClick={submit}
             disabled={loading || !draft.trim()}
-            aria-label="Send"
-            className="btn-primary h-[38px] w-[38px] shrink-0 p-0"
+            aria-label="Send Query"
+            className="btn-primary h-[38px] w-[38px] shrink-0 rounded-xl p-0 shadow-md"
           >
             {loading ? (
-              <span className="h-3.5 w-3.5 animate-spin-slow rounded-full border-2 border-white/40 border-t-white" />
+              <span className="h-4 w-4 animate-spin-slow rounded-full border-2 border-white/40 border-t-white" />
             ) : (
-              <Icon name="send" size={16} />
+              <Icon name="send" size={15} />
             )}
           </button>
         </div>
 
-        <p className="mt-1.5 px-0.5 text-[10.5px] muted">
-          Enter to send · Shift+Enter for a new line · ⌘K to focus
-        </p>
+        <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] muted">
+          <span>Press Enter to send · Shift+Enter for newline</span>
+          <span className="hidden sm:inline font-mono">⌘K composer</span>
+        </div>
       </div>
     </div>
   );

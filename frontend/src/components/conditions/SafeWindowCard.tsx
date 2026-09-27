@@ -1,17 +1,5 @@
 /**
- * When is it next safe to sail?
- *
- * Owner: D · Phase: P4
- *
- * The backend scores every hour of the forecast against the same thresholds that decide
- * the verdict, then groups the runs of safe hours (`services/safe_window.py`). This draws
- * them as a 72-hour strip, one cell per hour, so the shape of the week is visible at a
- * glance: three green blocks with a red band through Thursday reads faster than any
- * sentence about it.
- *
- * The strip is derived from the returned windows rather than from the raw hourly bands,
- * because those windows are what the safety logic actually committed to. Drawing the
- * hours independently would risk a strip that disagrees with the window above it.
+ * 72-Hour Safe Departure Passage Windows.
  */
 
 import Icon from "@/components/common/Icon";
@@ -22,7 +10,6 @@ interface Props {
   next: SafeWindow | null | undefined;
   windows: SafeWindow[];
   blockedBy: string[];
-  /** Start of the strip. Defaults to now. */
   from?: Date;
   hours?: number;
 }
@@ -36,7 +23,6 @@ export default function SafeWindowCard({
 }: Props) {
   const origin = from.getTime();
 
-  // Mark each hour of the strip according to which window, if any, covers it.
   const cells = Array.from({ length: hours }, (_, index) => {
     const at = origin + index * 3600_000;
     const covering = windows.find((window) => {
@@ -52,37 +38,41 @@ export default function SafeWindowCard({
     .filter(({ date }) => date.getHours() === 0);
 
   return (
-    <section className="card p-3">
+    <section className="card p-3.5 space-y-2.5">
       <div className="flex items-center gap-2">
-        <Icon name="clock" size={15} className="text-ocean-600 dark:text-ocean-300" />
-        <h3 className="panel-title">Departure windows</h3>
-        <span className="ml-auto text-[10.5px] muted">next 72 h</span>
+        <span className="grid h-6 w-6 place-items-center rounded-lg bg-ocean-500/15 text-ocean-700 dark:text-cyan-300">
+          <Icon name="clock" size={14} />
+        </span>
+        <h3 className="panel-title text-[13.5px]">Safe Departure Windows</h3>
+        <span className="ml-auto font-mono text-[10px] font-semibold text-ocean-700 dark:text-cyan-300">
+          72-Hour Horizon
+        </span>
       </div>
 
       {next ? (
-        <p className="mt-2.5 text-[13px] leading-snug text-slate-800 dark:text-slate-100">
+        <p className="text-[12.5px] leading-snug text-slate-800 dark:text-slate-100">
           Next{" "}
           <span
             className={
               next.quality === "clear"
-                ? "font-semibold band-go"
-                : "font-semibold band-caution"
+                ? "font-bold band-go"
+                : "font-bold band-caution"
             }
           >
             {next.quality}
           </span>{" "}
-          window <span className="font-semibold">{formatWindow(next)}</span>{" "}
-          <span className="muted">({next.hours} h)</span>
+          window: <span className="font-bold">{formatWindow(next)}</span>{" "}
+          <span className="muted font-mono font-medium">({next.hours} h safe passage)</span>
         </p>
       ) : (
-        <p className="mt-2.5 text-[13px] leading-snug band-no_go">
-          No run of four or more safe hours anywhere in the next 72 hours.
+        <p className="text-[12px] leading-snug band-no_go font-semibold">
+          No uninterrupted run of four safe sailing hours within the next 72 hours.
         </p>
       )}
 
-      {/* ── The strip ──────────────────────────────────────────────────── */}
-      <div className="relative mt-3">
-        <div className="flex h-7 gap-px overflow-hidden rounded-md">
+      {/* ── Visual 72h Timeline Strip ─────────────────────────────────── */}
+      <div className="relative pt-1">
+        <div className="flex h-7 gap-px overflow-hidden rounded-lg border border-sky-200/60 dark:border-white/10 shadow-inner">
           {cells.map((quality, index) => (
             <div
               key={index}
@@ -92,28 +82,28 @@ export default function SafeWindowCard({
                 minute: "2-digit",
               })} — ${
                 quality === "clear"
-                  ? "inside all limits"
+                  ? "Safe: inside all small-craft limits"
                   : quality === "workable"
-                    ? "marginal, but workable"
-                    : "past a small-craft limit"
+                    ? "Workable: marginal weather limits"
+                    : "No-go: exceeds safety limits"
               }`}
               className={`h-full flex-1 transition-colors ${
                 quality === "clear"
-                  ? "bg-emerald-500/80"
+                  ? "bg-emerald-500/90 hover:bg-emerald-400"
                   : quality === "workable"
-                    ? "bg-amber-500/70"
-                    : "bg-slate-300 dark:bg-white/10"
+                    ? "bg-amber-500/85 hover:bg-amber-400"
+                    : "bg-sky-200/70 hover:bg-sky-300/80 dark:bg-white/10 dark:hover:bg-white/20"
               }`}
             />
           ))}
         </div>
 
-        {/* Midnight ticks, so "Thursday" is locatable on the strip. */}
+        {/* Midnight day markers */}
         <div className="relative mt-1 h-3.5">
           {dayBoundaries.map(({ index, date }) => (
             <span
               key={index}
-              className="absolute text-[9.5px] font-medium muted"
+              className="absolute font-mono text-[9px] font-bold text-slate-500 dark:text-slate-400"
               style={{ left: `${(index / hours) * 100}%` }}
             >
               {date.toLocaleDateString(undefined, { weekday: "short" })}
@@ -122,26 +112,29 @@ export default function SafeWindowCard({
         </div>
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] muted">
+      <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[10px] muted font-medium">
         {[
-          ["bg-emerald-500/80", "Clear"],
-          ["bg-amber-500/70", "Workable"],
-          ["bg-slate-300 dark:bg-white/10", "Past a limit"],
+          ["bg-emerald-500", "Clear window"],
+          ["bg-amber-500", "Workable window"],
+          ["bg-sky-200 dark:bg-white/10", "Past safety limit"],
         ].map(([swatch, label]) => (
           <span key={label} className="inline-flex items-center gap-1.5">
-            <span className={`h-2 w-2 rounded-sm ${swatch}`} />
+            <span className={`h-2 w-2 rounded-full ${swatch}`} />
             {label}
           </span>
         ))}
       </div>
 
       {blockedBy.length > 0 && (
-        <div className="mt-2.5 border-t border-slate-200 pt-2.5 dark:border-white/10">
-          <p className="text-[10.5px] font-medium muted">Keeping you in harbour right now</p>
+        <div className="border-t border-sky-100 pt-2 dark:border-white/10">
+          <p className="text-[10.5px] font-bold text-slate-700 dark:text-slate-300">
+            Limiting factors holding vessels in harbour:
+          </p>
           <ul className="mt-1 space-y-0.5">
             {blockedBy.slice(0, 3).map((reason, index) => (
-              <li key={index} className="text-[11.5px] leading-snug band-caution">
-                {reason}
+              <li key={index} className="text-[11px] leading-snug band-caution flex items-center gap-1.5">
+                <span className="h-1 w-1 rounded-full bg-amber-500" />
+                <span>{reason}</span>
               </li>
             ))}
           </ul>
