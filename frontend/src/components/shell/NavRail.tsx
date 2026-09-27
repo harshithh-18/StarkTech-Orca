@@ -43,7 +43,7 @@ export default function NavRail({
   return (
     <nav
       aria-label="Main Navigation"
-      className={`z-20 flex shrink-0 border-sky-200/80 bg-white/95 backdrop-blur-md dark:border-cyan-500/15 dark:bg-abyss-900/95 ${
+      className={`z-20 flex shrink-0 border-slate-200 bg-white/98 backdrop-blur-md dark:border-white/10 dark:bg-[#080e1c] ${
         bar
           ? "h-[58px] w-full border-t md:hidden"
           : "hidden md:flex md:h-full md:w-[72px] md:flex-col md:border-r md:py-3.5 shadow-sm"
@@ -66,7 +66,7 @@ export default function NavRail({
                 bar ? "flex-1 py-1" : "h-[64px] w-full px-2"
               } ${
                 active
-                  ? "text-ocean-700 dark:text-cyan-300"
+                  ? "text-ocean-600 dark:text-ocean-400 font-bold"
                   : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
               }`}
             >
@@ -74,7 +74,7 @@ export default function NavRail({
               {active && (
                 <span
                   aria-hidden="true"
-                  className={`absolute inset-x-2 rounded-xl bg-gradient-to-br from-ocean-500/10 via-teal-500/10 to-marine-500/10 dark:from-ocean-500/20 dark:to-teal-500/20 ${
+                  className={`absolute inset-x-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 dark:border-emerald-400/20 dark:bg-emerald-500/15 ${
                     bar ? "inset-y-1" : "inset-y-1.5"
                   }`}
                 />
@@ -83,10 +83,10 @@ export default function NavRail({
               {/* Edge marker pill */}
               <span
                 aria-hidden="true"
-                className={`absolute bg-gradient-to-r from-ocean-500 to-marine-400 transition-all duration-200 ${
+                className={`absolute bg-emerald-500 dark:bg-emerald-400 transition-all duration-200 ${
                   bar
-                    ? "inset-x-6 top-0 h-0.5 rounded-b-full"
-                    : "inset-y-3 left-0 w-1 rounded-r-full shadow-sm shadow-cyan-400/50"
+                    ? "inset-x-6 top-0 h-0.5 rounded-b-full shadow-sm shadow-emerald-500/50"
+                    : "inset-y-3 left-0 w-1 rounded-r-full shadow-sm shadow-emerald-500/50"
                 } ${active ? "opacity-100" : "opacity-0"}`}
               />
 
@@ -94,8 +94,8 @@ export default function NavRail({
                 <span
                   className={`grid h-8 w-8 place-items-center rounded-lg transition-transform group-hover:scale-105 ${
                     active
-                      ? "bg-gradient-to-tr from-ocean-600 to-marine-500 text-white shadow-sm shadow-ocean-500/30 dark:from-ocean-500 dark:to-marine-400 dark:text-abyss-950 font-bold"
-                      : "group-hover:bg-sky-100/60 dark:group-hover:bg-white/[0.06]"
+                      ? "border border-emerald-400/50 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/30"
+                      : "group-hover:bg-slate-100 dark:group-hover:bg-white/[0.06]"
                   }`}
                 >
                   <Icon name={item.icon} size={18} />
@@ -119,7 +119,7 @@ export default function NavRail({
 
               <span
                 className={`relative z-10 text-[10.5px] font-bold tracking-tight leading-none ${
-                  active ? "text-ocean-700 dark:text-cyan-200" : ""
+                  active ? "text-emerald-700 dark:text-emerald-300" : ""
                 }`}
               >
                 {item.label}

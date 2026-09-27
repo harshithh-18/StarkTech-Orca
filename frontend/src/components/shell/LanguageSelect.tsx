@@ -63,81 +63,88 @@ export default function LanguageSelect({ value, auto = false, onChange }: Props)
       </button>
 
       {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 animate-slide-up overflow-hidden rounded-2xl border border-sky-200 bg-white/98 py-1.5 shadow-2xl backdrop-blur-md dark:border-cyan-500/20 dark:bg-abyss-850/98"
-        >
-          {/* Auto-detect button */}
-          <button
-            type="button"
-            role="menuitemradio"
-            aria-checked={auto}
-            onClick={() => {
-              onChange(null);
-              setOpen(false);
-            }}
-            className={`flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors ${
-              auto
-                ? "bg-ocean-500/10 dark:bg-ocean-400/10 text-ocean-900 dark:text-cyan-200"
-                : "hover:bg-sky-50 dark:hover:bg-white/5"
-            }`}
+        <>
+          <div
+            className="fixed inset-0 z-[90]"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+          <div
+            role="menu"
+            className="absolute right-0 top-[calc(100%+8px)] z-[100] w-64 animate-slide-up overflow-hidden rounded-2xl border border-slate-200 bg-white py-1.5 shadow-2xl dark:border-blue-500/30 dark:bg-[#0c1527] dark:shadow-tactical-elevated"
           >
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ocean-500/15 text-ocean-600 dark:text-cyan-300">
-              <Icon name="sparkles" size={15} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[12.5px] font-bold text-slate-900 dark:text-slate-100">
-                Auto-Detect Language
+            {/* Auto-detect button */}
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={auto}
+              onClick={() => {
+                onChange(null);
+                setOpen(false);
+              }}
+              className={`flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors ${
+                auto
+                  ? "bg-ocean-50 text-ocean-900 dark:bg-ocean-500/20 dark:text-white"
+                  : "hover:bg-slate-50 dark:hover:bg-white/5"
+              }`}
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-ocean-500/15 text-ocean-600 dark:text-ocean-400">
+                <Icon name="sparkles" size={15} />
               </span>
-              <span className="block text-[10.5px] leading-snug muted">
-                Detects input script & answers in the same Indic tongue.
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12.5px] font-bold text-slate-900 dark:text-slate-100">
+                  Auto-Detect Language
+                </span>
+                <span className="block text-[10.5px] leading-snug muted">
+                  Detects input script & answers in the same Indic tongue.
+                </span>
               </span>
-            </span>
-            {auto && (
-              <span className="rounded-full bg-marine-500/20 p-0.5 text-marine-700 dark:text-marine-300">
-                <Icon name="check" size={13} />
-              </span>
-            )}
-          </button>
+              {auto && (
+                <span className="rounded-full bg-emerald-500/20 p-0.5 text-emerald-700 dark:text-emerald-400">
+                  <Icon name="check" size={13} />
+                </span>
+              )}
+            </button>
 
-          <div className="my-1.5 h-px bg-sky-100 dark:bg-white/10" />
-          <p className="eyebrow px-3 pb-1 text-[10px] text-ocean-700 dark:text-ocean-300">
-            Pin Reply Language
-          </p>
+            <div className="my-1.5 h-px bg-slate-100 dark:bg-white/10" />
+            <p className="eyebrow px-3 pb-1 text-[10px] text-ocean-700 dark:text-ocean-300">
+              Pin Reply Language
+            </p>
 
-          <div className="max-h-64 overflow-y-auto py-0.5">
-            {LANGUAGES.map((language) => {
-              const selected = !auto && language.code === value;
-              return (
-                <button
-                  key={language.code}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={selected}
-                  onClick={() => {
-                    onChange(language.code);
-                    setOpen(false);
-                  }}
-                  className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors ${
-                    selected
-                      ? "bg-ocean-500/10 dark:bg-ocean-400/10 font-bold"
-                      : "hover:bg-sky-50 dark:hover:bg-white/5"
-                  }`}
-                >
-                  <span className="w-24 shrink-0 text-[13px] font-semibold text-slate-900 dark:text-slate-100">
-                    {language.label}
-                  </span>
-                  <span className="flex-1 truncate text-[11px] muted">{language.english}</span>
-                  {selected && (
-                    <span className="rounded-full bg-marine-500/20 p-0.5 text-marine-700 dark:text-marine-300">
-                      <Icon name="check" size={13} />
+            <div className="max-h-64 overflow-y-auto py-0.5 bg-white dark:bg-[#0c1527]">
+              {LANGUAGES.map((language) => {
+                const selected = !auto && language.code === value;
+                return (
+                  <button
+                    key={language.code}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={selected}
+                    onClick={() => {
+                      onChange(language.code);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-left transition-colors ${
+                      selected
+                        ? "bg-ocean-50 text-ocean-900 dark:bg-ocean-500/20 dark:text-white font-bold"
+                        : "hover:bg-slate-50 dark:hover:bg-white/5"
+                    }`}
+                  >
+                    <span className="w-24 shrink-0 text-[13px] font-semibold text-slate-900 dark:text-slate-100">
+                      {language.label}
                     </span>
-                  )}
-                </button>
-              );
-            })}
+                    <span className="flex-1 truncate text-[11px] muted">{language.english}</span>
+                    {selected && (
+                      <span className="rounded-full bg-emerald-500/20 p-0.5 text-emerald-700 dark:text-emerald-400">
+                        <Icon name="check" size={13} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

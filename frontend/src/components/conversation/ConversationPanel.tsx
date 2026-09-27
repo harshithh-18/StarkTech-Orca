@@ -178,7 +178,7 @@ export default function ConversationPanel({
   const starters = [...STARTERS[role], ...MULTILINGUAL_STARTERS];
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white/60 dark:bg-abyss-900/60 backdrop-blur-sm">
+    <div className="flex h-full min-h-0 flex-col bg-slate-50/60 dark:bg-[#080e1c]">
       {/* ── Chat Messages Scroll Area ─────────────────────────────────── */}
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4">
         {messages.length === 0 ? (
@@ -186,13 +186,13 @@ export default function ConversationPanel({
             {/* Operational Briefing Card */}
             <div className="card-ocean p-4 relative overflow-hidden">
               <div className="flex items-center gap-2">
-                <span className="grid h-6 w-6 place-items-center rounded-lg bg-ocean-500/20 text-ocean-700 dark:text-cyan-300">
+                <span className="grid h-6 w-6 place-items-center rounded-lg bg-ocean-500/20 text-ocean-700 dark:text-ocean-400">
                   <Icon name="compass" size={14} />
                 </span>
                 <p className="text-[13px] font-bold text-slate-900 dark:text-white">
                   Coastal Operations Briefing
                 </p>
-                <span className="ml-auto font-mono text-[10px] text-ocean-700 dark:text-cyan-300 font-semibold">
+                <span className="ml-auto font-mono text-[10px] text-ocean-700 dark:text-ocean-400 font-semibold">
                   {locationName}
                 </span>
               </div>
@@ -233,9 +233,9 @@ export default function ConversationPanel({
                       animationDelay: `${index * 40}ms`,
                       animationFillMode: "backwards",
                     }}
-                    className="group flex w-full animate-slide-up items-center gap-2.5 rounded-xl border border-sky-100 bg-white/90 px-3 py-2.5 text-left transition-all hover:border-ocean-400 hover:bg-ocean-50/50 hover:shadow-sm dark:border-white/10 dark:bg-abyss-850 dark:hover:border-cyan-400/40 dark:hover:bg-ocean-950/40"
+                    className="group flex w-full animate-slide-up items-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/[0.03] px-3 py-2.5 text-left transition-all hover:border-emerald-500/70 hover:bg-emerald-500/[0.08] hover:shadow-sm dark:border-emerald-400/25 dark:bg-emerald-500/[0.04] dark:hover:border-emerald-400/60 dark:hover:bg-emerald-500/[0.10] shadow-sm"
                   >
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-gradient-to-tr from-ocean-500/15 to-marine-500/15 text-ocean-700 dark:text-cyan-300 group-hover:scale-105 transition-transform">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 group-hover:scale-105 transition-transform">
                       <Icon name={starter.icon} size={15} />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -247,7 +247,7 @@ export default function ConversationPanel({
                     <Icon
                       name="arrow-right"
                       size={13}
-                      className="text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-ocean-600 dark:text-slate-600 dark:group-hover:text-cyan-400"
+                      className="text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-600 dark:text-slate-600 dark:group-hover:text-emerald-400"
                     />
                   </button>
                 ))}
@@ -269,7 +269,7 @@ export default function ConversationPanel({
       </div>
 
       {/* ── Floating Composer Dock ───────────────────────────────────── */}
-      <div className="shrink-0 border-t border-sky-100 bg-white/80 p-3 backdrop-blur-md dark:border-white/10 dark:bg-abyss-900/80">
+      <div className="shrink-0 border-t border-slate-200 bg-white/95 p-3 dark:border-white/10 dark:bg-[#080e1c]">
         <div className="flex items-end gap-2">
           <div className="relative flex-1">
             <textarea
@@ -306,7 +306,7 @@ export default function ConversationPanel({
               className={`btn relative h-[38px] w-[38px] shrink-0 rounded-xl border transition-all ${
                 voice.listening
                   ? "border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-500/30 scale-105"
-                  : "border-sky-200 bg-white text-ocean-700 hover:bg-ocean-50 hover:border-ocean-400 dark:border-white/10 dark:bg-abyss-850 dark:text-cyan-300 dark:hover:bg-white/[0.08]"
+                  : "border-emerald-500/40 bg-emerald-500/[0.06] text-emerald-700 hover:bg-emerald-500/15 hover:border-emerald-500/70 dark:border-emerald-400/30 dark:bg-emerald-500/[0.08] dark:text-emerald-300 dark:hover:bg-emerald-500/20"
               }`}
             >
               {voice.listening && (

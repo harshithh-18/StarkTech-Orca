@@ -134,12 +134,10 @@ export default function LayersPanel({
               <button
                 key={id}
                 type="button"
-                onClick={() => onBasemapChange(id)}
-                aria-pressed={basemap === id}
-                className={`flex-1 rounded-xl border px-3 py-2 text-[12px] font-bold transition-all ${
+                        className={`flex-1 rounded-xl border px-3 py-2 text-[12px] font-bold transition-all ${
                   basemap === id
-                    ? "border-ocean-500 bg-gradient-to-r from-ocean-600 to-teal-600 text-white shadow-sm"
-                    : "border-sky-200/80 bg-white text-slate-700 hover:bg-sky-50 dark:border-white/10 dark:bg-abyss-850 dark:text-slate-300 dark:hover:bg-white/5"
+                    ? "border border-emerald-400/50 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-500/20"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-emerald-400/40 hover:bg-emerald-500/[0.04] dark:border-white/10 dark:bg-abyss-850 dark:text-slate-300 dark:hover:bg-white/5"
                 }`}
               >
                 {BASEMAPS[id].label}
@@ -166,7 +164,7 @@ export default function LayersPanel({
                   >
                     <Swatch layer={layer} />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[12.5px] font-bold text-slate-900 dark:text-slate-100">
+                      <span className="block text-[12px] font-bold text-slate-900 dark:text-slate-100">
                         {meta.label}
                       </span>
                       <span className="block text-[11px] leading-snug muted">
@@ -194,8 +192,8 @@ export default function LayersPanel({
                 onClick={() => setActiveCategory(cat.id)}
                 className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
                   activeCategory === cat.id
-                    ? "bg-ocean-600 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-sky-100/60 dark:text-slate-300 dark:hover:bg-white/5"
+                    ? "border border-emerald-500/60 bg-emerald-600 text-white shadow-sm shadow-emerald-500/20"
+                    : "text-slate-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-slate-300 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-300"
                 }`}
               >
                 {cat.label}
@@ -215,7 +213,7 @@ export default function LayersPanel({
                 const prompt = LAYER_PROMPTS[layer];
 
                 return (
-                  <li key={layer} className="card p-2.5 transition-all hover:border-ocean-300">
+                  <li key={layer} className="card p-2.5 transition-all hover:border-emerald-400/50">
                     <div className="flex items-start gap-2.5">
                       <Swatch layer={layer} />
                       <div className="min-w-0 flex-1">
@@ -231,7 +229,7 @@ export default function LayersPanel({
                             aria-pressed={on}
                             title={on ? "Deactivate on map" : "Activate on map"}
                             className={`grid h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${
-                              on ? "bg-ocean-600 dark:bg-cyan-400" : "bg-sky-200 dark:bg-white/20"
+                              on ? "bg-emerald-600 dark:bg-emerald-500" : "bg-slate-200 dark:bg-white/20"
                             }`}
                           >
                             <span

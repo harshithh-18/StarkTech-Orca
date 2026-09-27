@@ -230,7 +230,7 @@ export default function AlertsPanel({
                             <button
                               type="button"
                               onClick={() => onShowOnMap()}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-200/80 bg-white/90 px-2 py-1 text-[10.5px] font-bold text-ocean-700 hover:bg-sky-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-cyan-300"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 py-1 text-[10.5px] font-bold text-emerald-800 hover:bg-emerald-500/20 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-300"
                             >
                               <Icon name="map" size={12} />
                               Locate on Chart
@@ -241,7 +241,7 @@ export default function AlertsPanel({
                             <button
                               type="button"
                               onClick={() => onAskAdvice(alert)}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-ocean-600 to-teal-600 px-2 py-1 text-[10.5px] font-bold text-white shadow-sm hover:from-ocean-500 hover:to-teal-500"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-400/50 bg-gradient-to-r from-emerald-600 to-teal-600 px-2 py-1 text-[10.5px] font-bold text-white shadow-sm hover:from-emerald-500 hover:to-teal-500"
                             >
                               <Icon name="chat" size={12} />
                               Ask AI Action Plan

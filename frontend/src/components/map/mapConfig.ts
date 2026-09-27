@@ -227,22 +227,28 @@ export function rampColor(layer: MapLayer, value: number, min: number, max: numb
  *     turns the deep Bay of Bengal white — the brightest thing on the screen is then the
  *     open ocean, in a marine application, in dark mode. Dimming it instead keeps deep
  *     water deep and darkens the land.
- *   - **Ocean's labels** are swapped rather than filtered. Esri's reference tiles are dark
- *     text with a pale halo; a CSS filter that makes them legible over a dimmed base also
- *     eats the anti-aliasing, and the names simply vanish. CARTO publishes a labels-only
- *     tile set drawn for dark maps, so dark mode loads that one instead — the right glyphs
- *     rather than the wrong ones, corrected.
+ *   - **Ocean's labels** in dark mode reuse Esri's own reference tiles, inverted in CSS
+ *     (see `.orca-reference-dark`). Esri publishes dark text with a pale halo; inverting it
+ *     yields light text with a dark halo, which reads cleanly over the dimmed base. We used
+ *     to load CARTO's `dark_only_labels` here instead, but CARTO retired its keyless
+ *     basemaps and now stamps every tile with an "API KEY REQUIRED" watermark — so a
+ *     keyless, watermark-free Esri layer is strictly better, and keeps ORCA true to its
+ *     "runs with no API keys" promise.
  */
+
+// Esri's ocean place-name labels — keyless, used in both themes (inverted in CSS for dark).
+const ESRI_OCEAN_REFERENCE =
+  "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}";
+
 export const BASEMAPS = {
   ocean: {
     label: "Ocean",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}",
-    reference:
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}",
-    darkReference:
-      "https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",
+    reference: ESRI_OCEAN_REFERENCE,
+    // Same keyless Esri labels; dark mode inverts them via the `orca-reference-dark` class.
+    darkReference: ESRI_OCEAN_REFERENCE,
     attribution:
-      'Tiles &copy; <a href="https://www.esri.com/">Esri</a> — GEBCO, NOAA · labels &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      'Tiles &copy; <a href="https://www.esri.com/">Esri</a> — GEBCO, NOAA',
     maxZoom: 13,
     darkBase: "orca-dim",
   },

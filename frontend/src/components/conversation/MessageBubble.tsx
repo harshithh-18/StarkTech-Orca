@@ -49,7 +49,7 @@ export default function MessageBubble({ message, onRetry, onSpeak, speaking }: P
   if (isUser) {
     return (
       <div className="flex animate-slide-up justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-gradient-to-r from-ocean-700 via-ocean-600 to-teal-600 px-4 py-2.5 text-[13.5px] font-medium leading-relaxed text-white shadow-md">
+        <div className="max-w-[85%] rounded-2xl rounded-br-sm border border-emerald-400/40 bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-700 px-4 py-2.5 text-[13.5px] font-medium leading-relaxed text-white shadow-md shadow-emerald-950/20">
           {message.text}
         </div>
       </div>
@@ -66,7 +66,7 @@ export default function MessageBubble({ message, onRetry, onSpeak, speaking }: P
           <Icon name="alert" size={15} />
         </span>
       ) : (
-        <Logo size={30} rounded="rounded-xl" className="mt-0.5 shadow-sm ring-1 ring-cyan-500/30" />
+        <Logo size={30} rounded="rounded-xl" className="mt-0.5 shadow-sm ring-1 ring-emerald-500/40" />
       )}
 
       <div

@@ -294,7 +294,7 @@ export default function App() {
   );
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-50 dark:bg-abyss-950">
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-50 dark:bg-[#060c18]">
       <TopBar
         location={profile.location}
         onLocationChange={setLocation}
@@ -348,7 +348,7 @@ export default function App() {
 
         {/* ── Primary Panel ─────────────────────────────────────────── */}
         <section
-          className={`min-h-0 flex-col border-sky-200/80 bg-white/95 md:flex md:w-[370px] md:shrink-0 md:border-r xl:w-[400px] dark:border-cyan-500/15 dark:bg-abyss-900/95 shadow-sm ${
+          className={`min-h-0 flex-col border-slate-200 bg-white md:flex md:w-[380px] md:shrink-0 md:border-r xl:w-[410px] dark:border-white/10 dark:bg-[#080e1c] shadow-sm ${
             mobileMap ? "hidden" : "flex flex-1"
           }`}
         >
@@ -417,7 +417,7 @@ export default function App() {
       <button
         type="button"
         onClick={() => setMobileMap((value) => !value)}
-        className="fixed bottom-[104px] right-3.5 z-[600] flex items-center gap-2 rounded-full border border-ocean-500/30 bg-ocean-600 px-4 py-2.5 text-[12.5px] font-bold text-white shadow-xl md:hidden active:scale-95"
+        className="fixed bottom-[104px] right-3.5 z-[600] flex items-center gap-2 rounded-full border border-emerald-400/50 bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 px-4 py-2.5 text-[12.5px] font-bold text-white shadow-xl shadow-emerald-600/30 md:hidden active:scale-95"
       >
         <Icon name={mobileMap ? "chat" : "map"} size={16} />
         {mobileMap ? "Operations Panel" : "Ocean Chart"}

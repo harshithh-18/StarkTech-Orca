@@ -461,11 +461,14 @@ export default function MapView({
 
         {referenceUrl && (
           <TileLayer
+            // Keyed on the theme so switching to dark re-mounts the layer with its filter.
             key={`${basemap}-reference-${isDark ? "dark" : "light"}`}
             url={referenceUrl}
             maxZoom={tiles.maxZoom}
             zIndex={650}
             attribution=""
+            // Dark mode inverts these keyless Esri labels to light-on-dark; see index.css.
+            className={isDark ? "orca-reference-dark" : undefined}
           />
         )}
 

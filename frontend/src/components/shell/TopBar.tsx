@@ -4,6 +4,8 @@
  * Identity, coastal station telemetry, live sea safety beacon, and operational controls.
  */
 
+import { useEffect, useState } from "react";
+
 import Icon from "@/components/common/Icon";
 import Logo from "@/components/common/Logo";
 import LanguageSelect from "@/components/shell/LanguageSelect";
@@ -104,17 +106,34 @@ export default function TopBar({
 }: Props) {
   const beacon = conditionVerdict ? BEACON_CONFIG[conditionVerdict] : null;
 
+  // Real-time maritime chronometer (UTC & IST)
+  const [time, setTime] = useState({
+    utc: new Date().toUTCString().slice(17, 25),
+    ist: new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: false }),
+  });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date();
+      setTime({
+        utc: now.toUTCString().slice(17, 25),
+        ist: now.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: false }),
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
-    <header className="relative z-30 flex h-14 shrink-0 items-center gap-2.5 sm:gap-3 border-b border-sky-200/80 bg-white/95 px-3 sm:px-4 backdrop-blur-md dark:border-cyan-500/15 dark:bg-abyss-900/95 shadow-sm">
+    <header className="relative z-40 flex h-14 shrink-0 items-center gap-2.5 sm:gap-3 border-b border-slate-200 bg-white/98 px-3 sm:px-4 backdrop-blur-md dark:border-white/10 dark:bg-[#080e1c] shadow-sm">
       {/* ── Brand Identity ────────────────────────────────────────────── */}
       <div className="flex items-center gap-2.5">
-        <Logo size={34} rounded="rounded-xl" className="shadow-sm ring-1 ring-cyan-500/20" />
+        <Logo size={34} rounded="rounded-xl" className="shadow-sm ring-1 ring-emerald-500/40" />
         <div className="hidden min-w-0 sm:block">
           <div className="flex items-center gap-1.5">
-            <span className="text-[15px] font-black leading-none tracking-tight text-slate-900 dark:text-white bg-gradient-to-r from-ocean-600 via-teal-500 to-marine-500 bg-clip-text text-transparent">
+            <span className="text-[15px] font-black leading-none tracking-tight text-slate-900 dark:text-white bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-400 bg-clip-text text-transparent">
               ORCA
             </span>
-            <span className="rounded-full bg-ocean-500/15 px-1.5 py-0.2 text-[9px] font-bold text-ocean-700 dark:text-ocean-300 tracking-wider">
+            <span className="rounded-full bg-emerald-500/15 px-1.5 py-0.2 text-[9px] font-bold text-emerald-700 dark:text-emerald-300 tracking-wider border border-emerald-500/30">
               OPS
             </span>
           </div>
@@ -124,10 +143,23 @@ export default function TopBar({
         </div>
       </div>
 
-      <div aria-hidden="true" className="hidden h-6 w-px bg-sky-200 sm:block dark:bg-white/10" />
+      <div aria-hidden="true" className="hidden h-6 w-px bg-slate-200 sm:block dark:bg-white/10" />
 
       {/* ── Coastal Station / Location ─────────────────────────────────── */}
       <LocationCommand value={location} onChange={onLocationChange} gps={gps} />
+
+      {/* ── Live Maritime UTC / IST Clock ─────────────────────────────── */}
+      <div className="hidden xl:flex items-center gap-2 rounded-lg bg-slate-100/80 px-2.5 py-1 font-mono text-[11px] text-slate-600 dark:bg-white/[0.04] dark:text-slate-300 border border-slate-200/70 dark:border-white/5">
+        <span className="flex items-center gap-1">
+          <span className="text-ocean-600 dark:text-ocean-400 font-bold">UTC</span>
+          <span>{time.utc}</span>
+        </span>
+        <span className="text-slate-300 dark:text-slate-700">·</span>
+        <span className="flex items-center gap-1">
+          <span className="text-emerald-600 dark:text-emerald-400 font-bold">IST</span>
+          <span>{time.ist}</span>
+        </span>
+      </div>
 
       {/* ── Live Sea Safety Beacon (Interactive Bridge to Conditions) ──── */}
       {beacon && onOpenConditions && (

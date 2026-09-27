@@ -22,8 +22,19 @@ import type { Harbour } from "@/types/orca";
 /** Enough to not render an empty control before the fetch resolves. Not the real list. */
 export const SEED: Harbour[] = [
   { name: "Kakinada", lat: 16.99, lon: 82.24, state: "Andhra Pradesh", coast: "east" },
+  { name: "Visakhapatnam", lat: 17.69, lon: 83.30, state: "Andhra Pradesh", coast: "east" },
   { name: "Chennai", lat: 13.08, lon: 80.29, state: "Tamil Nadu", coast: "east" },
+  { name: "Nagapattinam", lat: 10.77, lon: 79.85, state: "Tamil Nadu", coast: "east" },
+  { name: "Rameswaram", lat: 9.29, lon: 79.31, state: "Tamil Nadu", coast: "east" },
+  { name: "Paradip", lat: 20.26, lon: 86.67, state: "Odisha", coast: "east" },
+  { name: "Digha", lat: 21.62, lon: 87.53, state: "West Bengal", coast: "east" },
+  { name: "Port Blair", lat: 11.62, lon: 92.73, state: "Andaman & Nicobar", coast: "east" },
   { name: "Kochi", lat: 9.95, lon: 76.24, state: "Kerala", coast: "west" },
+  { name: "Kozhikode", lat: 11.25, lon: 75.75, state: "Kerala", coast: "west" },
+  { name: "Mangaluru", lat: 12.86, lon: 74.83, state: "Karnataka", coast: "west" },
+  { name: "Ratnagiri", lat: 16.99, lon: 73.30, state: "Maharashtra", coast: "west" },
+  { name: "Mumbai", lat: 18.94, lon: 72.83, state: "Maharashtra", coast: "west" },
+  { name: "Veraval", lat: 20.90, lon: 70.36, state: "Gujarat", coast: "west" },
 ];
 
 /** The default working location. Kakinada is the demo's home port. */

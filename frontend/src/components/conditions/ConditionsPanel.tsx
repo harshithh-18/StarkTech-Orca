@@ -133,20 +133,20 @@ export default function ConditionsPanel({
                     `Based on current conditions at ${location.name ?? "my location"} (verdict: ${data.verdict}), is it safe for small craft to sail today? What precautions are needed?`,
                   )
                 }
-                className="group flex w-full items-center justify-between rounded-xl border border-sky-200/90 bg-gradient-to-r from-sky-50 via-teal-50/50 to-white p-2.5 text-left transition-all hover:border-ocean-400 hover:shadow-sm dark:border-white/10 dark:from-abyss-850 dark:to-ocean-950/40"
+                className="group flex w-full items-center justify-between rounded-xl border border-emerald-500/40 bg-gradient-to-r from-emerald-50/60 via-teal-50/40 to-white p-2.5 text-left transition-all hover:border-emerald-500 hover:shadow-sm dark:border-emerald-400/30 dark:from-[#091a18] dark:via-[#0c1826] dark:to-[#081220]"
               >
                 <div className="flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-lg bg-ocean-500/15 text-ocean-700 dark:text-cyan-300">
+                  <span className="grid h-6 w-6 place-items-center rounded-lg border border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
                     <Icon name="chat" size={13} />
                   </span>
-                  <span className="text-[12px] font-bold text-ocean-900 dark:text-cyan-100">
+                  <span className="text-[12px] font-bold text-slate-900 dark:text-slate-100">
                     Ask ORCA to analyze these conditions
                   </span>
                 </div>
                 <Icon
                   name="arrow-right"
                   size={13}
-                  className="text-ocean-600 dark:text-cyan-300 transition-transform group-hover:translate-x-1"
+                  className="text-emerald-600 dark:text-emerald-400 transition-transform group-hover:translate-x-1"
                 />
               </button>
             )}

@@ -51,13 +51,13 @@ export default function ConditionsGlance({ data, loading, locationName, onOpen }
     <button
       type="button"
       onClick={onOpen}
-      className="group w-full rounded-2xl border border-sky-100 bg-white/95 p-3.5 text-left transition-all hover:border-ocean-400 hover:shadow-md dark:border-white/10 dark:bg-abyss-850 dark:hover:border-cyan-400/40"
+      className="group w-full rounded-2xl border border-slate-200 bg-white p-3.5 text-left transition-all hover:border-ocean-400 hover:shadow-md dark:border-white/10 dark:bg-[#0c1527] dark:hover:border-ocean-500/40 shadow-sm"
     >
       <div className="flex items-center gap-2">
         <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${verdict.dot}`} />
         <span className={`text-[13px] font-bold ${verdict.band}`}>{verdict.label}</span>
         <span className="truncate text-[11px] muted font-medium">at {locationName} right now</span>
-        <span className="ml-auto flex items-center gap-1 text-[11px] font-bold text-ocean-600 dark:text-cyan-300">
+        <span className="ml-auto flex items-center gap-1 text-[11px] font-bold text-ocean-600 dark:text-ocean-400">
           <span>Inspect</span>
           <Icon
             name="arrow-right"
@@ -72,10 +72,10 @@ export default function ConditionsGlance({ data, loading, locationName, onOpen }
           {tiles.map((tile) => (
             <div
               key={tile.field}
-              className="rounded-xl bg-sky-50/60 p-2 dark:bg-white/[0.04] border border-sky-100/60 dark:border-white/5"
+              className="rounded-xl bg-slate-50 p-2 dark:bg-[#080e1c] border border-slate-200/80 dark:border-white/5"
             >
               <span className="flex items-center gap-1 text-[9.5px] muted font-semibold truncate">
-                <Icon name={tileIcon(tile.icon)} size={11} className="text-ocean-600 dark:text-cyan-300" />
+                <Icon name={tileIcon(tile.icon)} size={11} className="text-ocean-600 dark:text-ocean-400" />
                 <span className="truncate">{tile.label}</span>
               </span>
               <span
@@ -91,8 +91,8 @@ export default function ConditionsGlance({ data, loading, locationName, onOpen }
       )}
 
       {window && (
-        <p className="mt-2.5 flex items-center gap-1.5 text-[10.5px] muted font-medium border-t border-sky-100/80 pt-2 dark:border-white/10">
-          <Icon name="clock" size={12} className="text-ocean-600 dark:text-cyan-300" />
+        <p className="mt-2.5 flex items-center gap-1.5 text-[10.5px] muted font-medium border-t border-slate-100 pt-2 dark:border-white/10">
+          <Icon name="clock" size={12} className="text-ocean-600 dark:text-ocean-400" />
           <span>Next {window.quality} sailing passage:</span>
           <span className="font-semibold text-slate-800 dark:text-slate-200">
             {formatWindowShort(window)}
