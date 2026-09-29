@@ -1,16 +1,19 @@
 /**
  * ORCA Maritime Operations & Intelligence Console — Command Onboarding Deck.
  *
- * Professional Maritime Operations Portal with live telemetry tickers,
- * dynamic stakeholder personas, and an interactive coastal station fleet.
+ * Professional Maritime Operations Landing Page inspired by modern maritime enterprise design.
+ * Features realistic oceanographic operations terminology, zero glass effects, solid high-contrast surfaces,
+ * and seamless color harmony with the sunset maritime photography in both dark and light modes.
  */
 
 import { useEffect, useState } from "react";
 
 import Icon, { type IconName } from "@/components/common/Icon";
 import Logo from "@/components/common/Logo";
+import ThemeToggle from "@/components/shell/ThemeToggle";
 import { useHarbours } from "@/hooks/useHarbours";
 import { LANGUAGES, ROLES } from "@/hooks/useProfile";
+import type { ThemeChoice } from "@/hooks/useTheme";
 import type { Language, Location, Role } from "@/types/orca";
 
 interface Props {
@@ -22,6 +25,8 @@ interface Props {
   onLanguageChange: (language: Language | null) => void;
   onLocationChange: (location: Location) => void;
   onEnter: () => void;
+  theme?: ThemeChoice;
+  onThemeCycle?: () => void;
 }
 
 const COAST_TABS = [
@@ -118,6 +123,8 @@ export default function WelcomeScreen({
   onLanguageChange,
   onLocationChange,
   onEnter,
+  theme,
+  onThemeCycle,
 }: Props) {
   const [harbourQuery, setHarbourQuery] = useState("");
   const [coastFilter, setCoastFilter] = useState<"all" | "east" | "west">("all");
@@ -151,465 +158,495 @@ export default function WelcomeScreen({
 
   const activeRoleDetail = ROLE_DETAILS[role];
 
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
-    <div className="relative min-h-full w-full overflow-y-auto bg-slate-50 text-slate-900 dark:bg-[#060c18] dark:text-slate-100 nautical-radar-grid">
-      {/* ── Top Tactical Status Bar ─────────────────────────────────────────── */}
-      <nav className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 px-4 py-2 backdrop-blur-md dark:border-white/10 dark:bg-[#080e1c]/95 sm:px-6">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 text-[11px]">
+    <div className="relative min-h-screen w-full overflow-y-auto text-slate-900 dark:text-slate-100 bg-[#f8fafc] dark:bg-[#060d19] selection:bg-amber-500 selection:text-white">
+      {/* ── Top Navigation Bar (Hydraoo inspired: Clean, Solid, High-Contrast) ── */}
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 lg:px-8 dark:border-slate-800 dark:bg-[#060d19]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+          {/* Brand Identity with clean circular logo */}
           <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 font-bold tracking-wider text-ocean-700 dark:text-ocean-300">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              SATELLITE & SENSOR TELEMETRY NOMINAL
-            </span>
-            <span className="hidden text-slate-300 dark:text-slate-700 sm:inline">|</span>
-            <span className="hidden font-mono text-slate-600 dark:text-slate-400 md:inline">
-              INCOIS OCEANSAT · COPERNICUS L3 · IMD RADAR
-            </span>
+            <Logo size={34} rounded="rounded-full" className="shrink-0" />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[17px] font-black tracking-tight text-slate-900 dark:text-white">
+                  ORCA
+                </span>
+                <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-amber-800 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-300 tracking-wider">
+                  MARITIME OPS
+                </span>
+              </div>
+              <p className="hidden sm:block text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                Marine EcoSystem Reasoning with Collaborative Agents
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 font-mono text-[11px]">
-            <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
-              <span className="font-bold text-ocean-600 dark:text-ocean-400">UTC</span>
-              <span>{time.utc}</span>
+          {/* Nav Links (Realistic Maritime Operations, No SaaS fluff) */}
+          <nav className="hidden md:flex items-center gap-6 text-[13px] font-semibold text-slate-600 dark:text-slate-300">
+            <button
+              type="button"
+              onClick={() => scrollToSection("mission-roles")}
+              className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+            >
+              Operations
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection("coastal-stations")}
+              className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+            >
+              Coastal Stations
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection("mission-scope")}
+              className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+            >
+              Swarm Engine
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection("indic-language")}
+              className="hover:text-amber-600 dark:hover:text-amber-400 transition-colors"
+            >
+              Indic AI
+            </button>
+          </nav>
+
+          {/* Right Controls: Chronometer + Theme + Launch */}
+          <div className="flex items-center gap-3">
+            <div className="hidden lg:flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-mono text-[11px] text-slate-700 dark:border-slate-800 dark:bg-[#0c1626] dark:text-slate-300">
+              <span className="font-bold text-amber-600 dark:text-amber-400">UTC {time.utc}</span>
+              <span className="text-slate-400">·</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">IST {time.ist}</span>
             </div>
-            <span className="text-slate-300 dark:text-slate-700">·</span>
-            <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300">
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">IST</span>
-              <span>{time.ist}</span>
-            </div>
+
+            {theme && onThemeCycle && (
+              <ThemeToggle choice={theme} onCycle={onThemeCycle} />
+            )}
+
+            <button
+              type="button"
+              onClick={onEnter}
+              className="inline-flex items-center justify-center gap-1.5 rounded-full bg-slate-900 px-4 py-2 text-[12.5px] font-bold text-white shadow-sm transition-all hover:bg-slate-800 active:scale-95 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+            >
+              <span>Launch Console</span>
+              <Icon name="arrow-right" size={13} />
+            </button>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* ── Main Command Bridge Canvas ──────────────────────────────────────── */}
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        {/* ── Masthead Hero Section ─────────────────────────────────────────── */}
-        <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-ocean-50/50 p-6 shadow-xl dark:border-ocean-500/25 dark:bg-command-deck sm:p-8">
-          {/* Subtle radar sweep & decorative ambient glow */}
-          <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-ocean-500/10 blur-3xl dark:bg-ocean-600/15" />
-          <div className="pointer-events-none absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-hydro-500/10 blur-3xl dark:bg-hydro-600/15" />
+      {/* ── Hero Section (Hydraoo-Inspired with Sunset Fisherman Backdrop) ──── */}
+      <section className="relative landing-hero-backdrop border-b border-slate-200 dark:border-slate-800 py-16 sm:py-24 lg:py-28 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="max-w-2xl lg:max-w-3xl">
+            {/* Pill Tag Badge */}
+            <div className="hero-tag-badge">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span>Operational Oceanographic Intelligence for India's Maritime Frontier</span>
+            </div>
 
-          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-start gap-4 sm:items-center sm:gap-5">
-              <Logo
-                size={64}
-                rounded="rounded-2xl"
-                className="shadow-xl ring-2 ring-ocean-500/40 shrink-0"
-              />
-              <div>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white sm:text-4xl">
-                    ORCA
-                  </h1>
-                  <span className="rounded-md border border-ocean-500/30 bg-ocean-500/10 px-2 py-0.5 text-[10px] font-bold tracking-widest text-ocean-700 dark:text-ocean-300">
-                    MARITIME COMMAND
-                  </span>
-                  <span className="rounded-md border border-slate-200 bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-                    GOV OF INDIA · SIH
-                  </span>
-                </div>
-                <p className="mt-1 text-sm font-semibold text-ocean-700 dark:text-hydro-300 sm:text-[15px]">
-                  Marine EcoSystem Reasoning with Collaborative Agents
-                </p>
-                <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-slate-600 dark:text-slate-300 sm:text-sm">
-                  Autonomous oceanographic decision system for India's 7,516 km coastline. Interrogate live
-                  ocean models, calculate potential fishing zones, verify maritime boundaries (EEZ/IMBL),
-                  and synthesize Go / No-Go passage safety with explainable multi-agent telemetry.
-                </p>
+            {/* Bold Headline (Matching Hydraoo Aesthetic) */}
+            <h1 className="mt-5 text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.08]">
+              Built for Coastal Waters.
+              <br />
+              <span className="text-amber-600 dark:text-amber-400">Ready for the Ocean.</span>
+            </h1>
+
+            {/* Action Row */}
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+              <button
+                type="button"
+                onClick={onEnter}
+                className="btn-hero-primary"
+              >
+                <span>Launch Operations Deck</span>
+                <Icon name="arrow-right" size={15} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => scrollToSection("mission-roles")}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white px-5 py-3 text-[14px] font-bold text-slate-800 shadow-sm transition-all hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <span>Configure Station & Role</span>
+                <Icon name="chevron" size={14} />
+              </button>
+
+              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[12px] font-semibold text-slate-700 dark:border-slate-800 dark:bg-[#0c1626] dark:text-slate-300">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-sm shadow-emerald-500/50" />
+                <span>14 Base Harbours Online</span>
               </div>
             </div>
 
-            {/* Tactical stats strip */}
-            <div className="grid grid-cols-2 gap-2.5 rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-white/10 dark:bg-[#0c1527]/80 backdrop-blur shrink-0 sm:grid-cols-4 lg:grid-cols-2">
-              <div className="p-1.5">
-                <span className="block font-mono text-[9.5px] uppercase tracking-wider text-slate-400">
+            {/* Subtext Paragraph */}
+            <p className="mt-6 text-[14px] sm:text-[15px] leading-relaxed text-slate-700 dark:text-slate-300 font-medium">
+              Synthesizing real-time oceanographic models, INCOIS Potential Fishing Zones (PFZ),
+              and maritime boundary compliance across India's 7,516 km coastline.
+            </p>
+
+            {/* Operational Telemetry KPIs */}
+            <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-xl border border-slate-200 bg-white p-3 text-center dark:border-slate-800 dark:bg-[#0a1322]">
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
                   Coastline
                 </span>
-                <span className="font-mono text-base font-black text-slate-900 dark:text-white">
+                <span className="mt-0.5 block text-lg font-black text-slate-900 dark:text-white">
                   7,516 km
                 </span>
               </div>
-              <div className="p-1.5">
-                <span className="block font-mono text-[9.5px] uppercase tracking-wider text-slate-400">
-                  Maritime States
+
+              <div className="rounded-xl border border-slate-200 bg-white p-3 text-center dark:border-slate-800 dark:bg-[#0a1322]">
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
+                  Fleet Stations
                 </span>
-                <span className="font-mono text-base font-black text-ocean-600 dark:text-ocean-400">
-                  9 States + 2 UT
-                </span>
-              </div>
-              <div className="p-1.5">
-                <span className="block font-mono text-[9.5px] uppercase tracking-wider text-slate-400">
-                  Fleet Ports
-                </span>
-                <span className="font-mono text-base font-black text-slate-900 dark:text-white">
-                  14 Stations
+                <span className="mt-0.5 block text-lg font-black text-amber-600 dark:text-amber-400">
+                  14 Harbours
                 </span>
               </div>
-              <div className="p-1.5">
-                <span className="block font-mono text-[9.5px] uppercase tracking-wider text-slate-400">
-                  Swarm Engine
+
+              <div className="rounded-xl border border-slate-200 bg-white p-3 text-center dark:border-slate-800 dark:bg-[#0a1322]">
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
+                  Swarm Specialists
                 </span>
-                <span className="font-mono text-base font-black text-emerald-600 dark:text-emerald-400">
-                  5 Specialists
+                <span className="mt-0.5 block text-lg font-black text-emerald-600 dark:text-emerald-400">
+                  5 Agents
+                </span>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white p-3 text-center dark:border-slate-800 dark:bg-[#0a1322]">
+                <span className="block font-mono text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-bold">
+                  Indic Dialects
+                </span>
+                <span className="mt-0.5 block text-lg font-black text-slate-900 dark:text-white">
+                  10 Languages
                 </span>
               </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* ── Two-Column Operational Configuration Deck ─────────────────────── */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-12 lg:items-start">
-          {/* ═══════════════════════════════════════════════════════════════════
-              LEFT COLUMN: Role Persona Hub & Indic Language Control
-             ═══════════════════════════════════════════════════════════════════ */}
-          <div className="space-y-6 lg:col-span-5">
-            {/* Step 1: Maritime Role Selection */}
-            <div className="card p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/10">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-lg border border-emerald-500/30 bg-emerald-500/15 font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                    01
-                  </span>
-                  <h2 className="text-[14.5px] font-bold text-slate-900 dark:text-white">
-                    Select Your Operational Role
-                  </h2>
-                </div>
-                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                  Configures Swarm Behavior
+      {/* ── Operational Configuration Deck (Zero Glass / Solid Surfaces) ────── */}
+      <main className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-10">
+        {/* Section 01: Operational Roles & Swarm Scope */}
+        <div id="mission-roles" className="solid-panel space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 dark:border-slate-800 gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="grid h-6 w-6 place-items-center rounded-lg bg-amber-500/10 font-mono text-[11px] font-bold text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+                  01
                 </span>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Select Operational Role
+                </h2>
               </div>
+              <p className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                Calibrates agent models, risk thresholds, and acoustic alerts to your vessel mission
+              </p>
+            </div>
+            <span className="self-start sm:self-auto rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 font-mono text-[11px] font-bold text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/15 dark:text-amber-300">
+              Active Persona: {role.toUpperCase()}
+            </span>
+          </div>
 
-              <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-1">
-                {ROLES.map((option) => {
-                  const selected = role === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => onRoleChange(option.id)}
-                      aria-pressed={selected}
-                      className={`group flex items-start gap-3 rounded-2xl border p-3.5 text-left transition-all duration-150 ${
-                        selected
-                          ? "border-emerald-500/90 bg-emerald-500/10 ring-2 ring-emerald-500/25 dark:border-emerald-400/90 dark:bg-emerald-500/15 dark:ring-emerald-500/30 shadow-sm shadow-emerald-500/15"
-                          : "border-slate-200 bg-white hover:border-emerald-400/50 hover:bg-emerald-500/[0.03] dark:border-white/10 dark:bg-[#0a1224] dark:hover:border-emerald-400/30 dark:hover:bg-emerald-500/[0.04]"
-                      }`}
-                    >
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {ROLES.map((option) => {
+              const selected = role === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => onRoleChange(option.id)}
+                  aria-pressed={selected}
+                  className={`flex flex-col justify-between rounded-xl border p-4 text-left transition-all duration-150 ${
+                    selected
+                      ? "border-amber-500 bg-amber-500/[0.08] ring-2 ring-amber-500/25 shadow-sm dark:border-amber-400 dark:bg-amber-400/10 dark:ring-amber-400/30"
+                      : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-[#0c1626] dark:hover:border-slate-700 dark:hover:bg-[#101e34]"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
                       <span
-                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl transition-colors ${
+                        className={`grid h-9 w-9 place-items-center rounded-lg ${
                           selected
-                            ? "border border-emerald-400/50 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/30"
-                            : "bg-slate-100 text-slate-600 dark:bg-white/[0.06] dark:text-slate-300"
+                            ? "bg-amber-500 text-slate-950 font-bold shadow-sm"
+                            : "bg-slate-200/70 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
                         }`}
                       >
                         <Icon name={option.icon as IconName} size={18} />
                       </span>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="block text-[13.5px] font-bold text-slate-900 dark:text-white">
-                            {option.label}
-                          </span>
-                          {selected && (
-                            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-                              Active
-                            </span>
-                          )}
-                        </div>
-                        <span className="mt-0.5 block text-[11.5px] leading-snug muted">
-                          {option.blurb}
+                      {selected && (
+                        <span className="rounded-full bg-amber-500 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-950">
+                          ACTIVE
                         </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Dynamic Role Intelligence Deck (Interactive Scope) */}
-              <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-br from-emerald-50/60 via-white to-emerald-50/30 p-4 shadow-sm dark:border-emerald-400/30 dark:bg-gradient-to-br dark:from-[#091a18] dark:via-[#0c1827] dark:to-[#081220]">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                    Active Mission Scope
-                  </span>
-                  <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                    Live Telemetry Profile
-                  </span>
-                </div>
-
-                <p className="mt-1.5 text-[12.5px] leading-relaxed text-slate-700 dark:text-slate-200 font-normal">
-                  {activeRoleDetail.description}
-                </p>
-
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {activeRoleDetail.agents.map((agent) => (
-                    <span
-                      key={agent}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-300 shadow-sm"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400" />
-                      {agent}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="mt-3.5 grid grid-cols-3 gap-2.5 border-t border-slate-200/80 pt-3 dark:border-white/10">
-                  {activeRoleDetail.telemetryMetrics.map((metric) => (
-                    <div key={metric.label}>
-                      <span className="block truncate font-mono text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
-                        {metric.label}
-                      </span>
-                      <span className="mt-0.5 block truncate font-mono text-[12px] font-bold text-slate-900 dark:text-white">
-                        {metric.value}
-                      </span>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Step 2: Indic Language & Dialect Configuration */}
-            <div className="card p-5 space-y-3.5">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/10">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-lg border border-emerald-500/30 bg-emerald-500/15 font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                    02
-                  </span>
-                  <h2 className="text-[14.5px] font-bold text-slate-900 dark:text-white">
-                    Output Reply Language
-                  </h2>
-                </div>
-                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                  Bhashini / Indic AI
-                </span>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => onLanguageChange(null)}
-                  aria-pressed={autoLanguage}
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-[12px] font-bold transition-all ${
-                    autoLanguage
-                      ? "border-emerald-500 bg-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-emerald-400/50 hover:bg-emerald-500/10 dark:border-white/10 dark:bg-[#0a1224] dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:bg-emerald-500/15"
-                  }`}
-                >
-                  <Icon name="sparkles" size={14} />
-                  Auto-Detect (Match Query Tongue)
-                </button>
-
-                {LANGUAGES.map((option) => {
-                  const selected = !autoLanguage && option.code === language;
-                  return (
-                    <button
-                      key={option.code}
-                      type="button"
-                      onClick={() => onLanguageChange(option.code)}
-                      aria-pressed={selected}
-                      className={`rounded-xl border px-3 py-2 text-[12px] font-semibold transition-all ${
-                        selected
-                          ? "border-emerald-500 bg-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-emerald-400/50 hover:bg-emerald-500/10 dark:border-white/10 dark:bg-[#0a1224] dark:text-slate-200 dark:hover:border-emerald-400/40 dark:hover:bg-emerald-500/15"
-                      }`}
-                    >
-                      <span>{option.label}</span>
-                      <span
-                        className={`ml-1 text-[10.5px] font-normal ${
-                          selected ? "text-emerald-100" : "opacity-60"
-                        }`}
-                      >
-                        ({option.english})
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="text-[11px] leading-relaxed muted">
-                ORCA seamlessly listens and responds in Tamil, Telugu, Malayalam, Bengali, Hindi, and English.
-              </p>
-            </div>
-          </div>
-
-          {/* ═══════════════════════════════════════════════════════════════════
-              RIGHT COLUMN: Interactive Coastal Station Fleet & Harbour Grid
-             ═══════════════════════════════════════════════════════════════════ */}
-          <div className="space-y-6 lg:col-span-7">
-            <div className="card p-5 space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 dark:border-white/10">
-                <div className="flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-lg border border-emerald-500/30 bg-emerald-500/15 font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                    03
-                  </span>
-                  <div>
-                    <h2 className="text-[14.5px] font-bold text-slate-900 dark:text-white">
-                      Anchor Your Coastal Station
-                    </h2>
-                    <p className="text-[11px] muted">
-                      Choose your default harbour or active vessel mooring zone
+                    <span className="mt-3 block text-[14px] font-bold text-slate-900 dark:text-white">
+                      {option.label}
+                    </span>
+                    <p className="mt-1 text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-400">
+                      {option.blurb}
                     </p>
                   </div>
-                </div>
+                </button>
+              );
+            })}
+          </div>
 
-                <div className="flex items-center gap-1.5 self-start rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-300 sm:self-auto">
-                  <Icon name="gps" size={13} />
-                  <span>
-                    Current Anchor: <strong className="underline">{location.name}</strong>
-                  </span>
-                </div>
-              </div>
-
-              {/* Coastal Sector Filter Tabs */}
-              <div className="flex flex-wrap gap-1.5 border-b border-slate-100 pb-3 dark:border-white/10">
-                {COAST_TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setCoastFilter(tab.id)}
-                    className={`rounded-lg px-3.5 py-1.5 text-[11.5px] font-bold transition-all ${
-                      coastFilter === tab.id
-                        ? "border border-emerald-500/60 bg-emerald-600 text-white shadow-md shadow-emerald-500/25"
-                        : "border border-transparent text-slate-600 hover:border-emerald-400/30 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-slate-300 dark:hover:border-emerald-400/30 dark:hover:bg-emerald-500/15 dark:hover:text-emerald-300"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Harbour Search Bar */}
-              <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 dark:border-white/10 dark:bg-[#080e1c] focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 dark:focus-within:border-emerald-400">
-                <Icon name="search" size={16} className="text-emerald-600 dark:text-emerald-400" />
-                <input
-                  value={harbourQuery}
-                  onChange={(event) => setHarbourQuery(event.target.value)}
-                  placeholder="Search 14 Indian harbours or states (e.g. Kakinada, Kochi, Tamil Nadu)…"
-                  aria-label="Search harbours"
-                  className="w-full bg-transparent text-[13px] text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-slate-100"
-                />
-              </div>
-
-              {/* Interactive Harbour Cards Grid (2 Columns on medium+ screens) */}
-              <div className="grid gap-2.5 sm:grid-cols-2 max-h-[380px] overflow-y-auto pr-1">
-                {harbours.map((harbour) => {
-                  const selected = harbour.name === location.name;
-                  const telemetry = HARBOUR_CONDITIONS[harbour.name] ?? { status: "Safe", wave: "1.0m" };
-
-                  return (
-                    <button
-                      key={harbour.name}
-                      type="button"
-                      onClick={() =>
-                        onLocationChange({
-                          lat: harbour.lat,
-                          lon: harbour.lon,
-                          name: harbour.name,
-                          source: "harbour",
-                        })
-                      }
-                      aria-pressed={selected}
-                      className={`group relative flex flex-col justify-between rounded-xl border p-3 text-left transition-all duration-150 ${
-                        selected
-                          ? "border-emerald-500/90 bg-emerald-500/10 ring-2 ring-emerald-500/25 dark:border-emerald-400/90 dark:bg-emerald-500/15 dark:ring-emerald-500/30 shadow-sm shadow-emerald-500/15"
-                          : "border-slate-200 bg-white hover:border-emerald-400/50 hover:bg-emerald-500/[0.03] dark:border-white/10 dark:bg-[#0a1224] dark:hover:border-emerald-400/30 dark:hover:bg-emerald-500/[0.04]"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <span className="block truncate text-[13px] font-bold text-slate-900 dark:text-white">
-                            {harbour.name}
-                          </span>
-                          <span className="block truncate text-[11px] muted">
-                            {harbour.state}
-                          </span>
-                        </div>
-
-                        {/* Sea State Telemetry Badge */}
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-bold ${
-                            telemetry.status === "Safe"
-                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                              : telemetry.status === "Caution"
-                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                                : "bg-rose-500/15 text-rose-700 dark:text-rose-300"
-                          }`}
-                        >
-                          {telemetry.status} · {telemetry.wave}
-                        </span>
-                      </div>
-
-                      <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[10px] font-mono dark:border-white/5">
-                        <span className="text-slate-500 dark:text-slate-400">
-                          {harbour.lat.toFixed(2)}°N {harbour.lon.toFixed(2)}°E
-                        </span>
-                        <span className="uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-semibold">
-                          {harbour.coast === "east" ? "Bay of Bengal" : "Arabian Sea"}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-
-                {harbours.length === 0 && (
-                  <div className="col-span-2 py-8 text-center text-sm muted">
-                    No harbours matching “{harbourQuery}”. You can also pinpoint any coastal coordinate on
-                    the chart map.
-                  </div>
-                )}
-              </div>
-
-              {/* Active Selected Port HUD */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-emerald-500/40 bg-emerald-500/[0.08] p-3 dark:border-emerald-400/30 dark:bg-emerald-500/[0.08]">
-                <div className="flex items-center gap-2.5 text-[12px]">
-                  <span className="grid h-7 w-7 place-items-center rounded-lg border border-emerald-400/50 bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm">
-                    <Icon name="anchor" size={14} />
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-900 dark:text-white">
-                      {location.name} Naval Base
-                    </span>
-                    <span className="ml-2 font-mono text-[11px] text-emerald-700 dark:text-emerald-300 font-bold">
-                      {location.lat.toFixed(2)}°N, {location.lon.toFixed(2)}°E
-                    </span>
-                  </div>
-                </div>
-
-                <span className="font-mono text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400">
-                  ● Telemetry Link Online
-                </span>
-              </div>
+          {/* Dynamic Mission Scope Display */}
+          <div id="mission-scope" className="rounded-xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-[#0c1626]">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 border-b border-slate-200 pb-3 dark:border-slate-800">
+              <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                Operational Telemetry Profile: {activeRoleDetail.title}
+              </span>
+              <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">
+                Multi-Agent Synthesis Engine
+              </span>
             </div>
 
-            {/* ── Operational Launch Action Card ────────────────────────────── */}
-            <div className="card p-5 border border-emerald-500/40 bg-gradient-to-r from-emerald-50/50 via-white to-emerald-50/50 dark:border-emerald-400/30 dark:bg-gradient-to-r dark:from-[#0a1c1d] dark:via-[#0c172e] dark:to-[#081322]">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-base font-black text-slate-900 dark:text-white">
-                    Ready to Command
-                  </h3>
-                  <p className="text-[12px] muted">
-                    Session configured: <strong className="text-slate-800 dark:text-slate-200">{role}</strong> at{" "}
-                    <strong className="text-slate-800 dark:text-slate-200">{location.name}</strong> (
-                    {autoLanguage ? "Auto-Detect Language" : language.toUpperCase()})
-                  </p>
-                </div>
+            <p className="mt-3 text-[13px] leading-relaxed text-slate-700 dark:text-slate-300 font-medium">
+              {activeRoleDetail.description}
+            </p>
 
-                <button
-                  type="button"
-                  onClick={onEnter}
-                  className="btn-primary w-full sm:w-auto px-7 py-3 text-[14.5px] font-black tracking-wide shadow-lg shadow-emerald-500/30 active:scale-95 border border-emerald-400/60"
+            <div className="mt-4 flex flex-wrap gap-2">
+              {activeRoleDetail.agents.map((agent) => (
+                <span
+                  key={agent}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1 font-mono text-[11px] font-semibold text-slate-800 dark:border-slate-700 dark:bg-[#101e34] dark:text-slate-200"
                 >
-                  <span>Launch Maritime Console</span>
-                  <Icon name="arrow-right" size={16} />
-                </button>
-              </div>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  {agent}
+                </span>
+              ))}
+            </div>
 
-              <p className="mt-3 text-[10.5px] leading-relaxed muted text-center sm:text-left border-t border-slate-200/80 pt-2.5 dark:border-white/10">
-                Official statutory notice: ORCA is an AI decision-support platform designed for coastal
-                resilience. For statutory severe-weather notices, consult Indian Meteorological Department (IMD)
-                and INCOIS.
-              </p>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+              {activeRoleDetail.telemetryMetrics.map((metric) => (
+                <div key={metric.label} className="rounded-lg bg-white p-2.5 dark:bg-[#101e34] border border-slate-200 dark:border-slate-700/60">
+                  <span className="block truncate font-mono text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+                    {metric.label}
+                  </span>
+                  <span className="mt-0.5 block truncate font-mono text-[12px] font-bold text-slate-900 dark:text-white">
+                    {metric.value}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
+
+        {/* Section 02: Coastal Base Station Mooring (14 Harbours) */}
+        <div id="coastal-stations" className="solid-panel space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4 dark:border-slate-800 gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="grid h-6 w-6 place-items-center rounded-lg bg-amber-500/10 font-mono text-[11px] font-bold text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+                  02
+                </span>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Anchor Coastal Base Station
+                </h2>
+              </div>
+              <p className="mt-1 text-[12px] text-slate-500 dark:text-slate-400">
+                Mooring port and coastal sector for localized wave, SST, and boundary alerts
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 self-start rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-semibold text-slate-800 dark:border-slate-800 dark:bg-[#0c1626] dark:text-slate-200 sm:self-auto">
+              <Icon name="anchor" size={13} className="text-amber-600 dark:text-amber-400" />
+              <span>
+                Anchor: <strong className="text-amber-600 dark:text-amber-400">{location.name}</strong> ({location.lat.toFixed(2)}°N, {location.lon.toFixed(2)}°E)
+              </span>
+            </div>
+          </div>
+
+          {/* Sector Filter Tabs & Search */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-1.5">
+              {COAST_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setCoastFilter(tab.id)}
+                  className={`rounded-lg px-3.5 py-1.5 text-[12px] font-bold transition-all border ${
+                    coastFilter === tab.id
+                      ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-950"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:bg-[#0c1626] dark:text-slate-300 dark:hover:border-slate-700"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-[13px] text-slate-900 dark:border-slate-800 dark:bg-[#0c1626] dark:text-slate-100 min-w-[280px]">
+              <Icon name="search" size={15} className="text-slate-400" />
+              <input
+                value={harbourQuery}
+                onChange={(event) => setHarbourQuery(event.target.value)}
+                placeholder="Search harbours or states…"
+                aria-label="Search harbours"
+                className="w-full bg-transparent placeholder:text-slate-400 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Harbours Grid */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 max-h-[380px] overflow-y-auto pr-1">
+            {harbours.map((harbour) => {
+              const selected = harbour.name === location.name;
+              const telemetry = HARBOUR_CONDITIONS[harbour.name] ?? { status: "Safe", wave: "1.0m" };
+
+              return (
+                <button
+                  key={harbour.name}
+                  type="button"
+                  onClick={() =>
+                    onLocationChange({
+                      lat: harbour.lat,
+                      lon: harbour.lon,
+                      name: harbour.name,
+                      source: "harbour",
+                    })
+                  }
+                  aria-pressed={selected}
+                  className={`flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all ${
+                    selected
+                      ? "border-amber-500 bg-amber-500/[0.08] ring-2 ring-amber-500/25 dark:border-amber-400 dark:bg-amber-400/10 dark:ring-amber-400/30"
+                      : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-[#0c1626] dark:hover:border-slate-700 dark:hover:bg-[#101e34]"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="block truncate text-[13.5px] font-bold text-slate-900 dark:text-white">
+                        {harbour.name}
+                      </span>
+                      <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">
+                        {harbour.state}
+                      </span>
+                    </div>
+
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[9.5px] font-bold border ${
+                        telemetry.status === "Safe"
+                          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                          : telemetry.status === "Caution"
+                            ? "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                            : "border-rose-500/40 bg-rose-500/10 text-rose-800 dark:text-rose-300"
+                      }`}
+                    >
+                      {telemetry.status} · {telemetry.wave}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-2 text-[10.5px] font-mono dark:border-slate-800">
+                    <span className="text-slate-500 dark:text-slate-400">
+                      {harbour.lat.toFixed(2)}°N {harbour.lon.toFixed(2)}°E
+                    </span>
+                    <span className="text-slate-600 dark:text-slate-300 font-medium">
+                      {harbour.coast === "east" ? "Bay of Bengal" : "Arabian Sea"}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 03: Indic Reply Language */}
+        <div id="indic-language" className="solid-panel space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-3 dark:border-slate-800 gap-1">
+            <div className="flex items-center gap-2">
+              <span className="grid h-6 w-6 place-items-center rounded-lg bg-amber-500/10 font-mono text-[11px] font-bold text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+                03
+              </span>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Output Reply Language (Indic AI)
+              </h2>
+            </div>
+            <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 font-semibold">
+              Bhashini Multilingual Bridge
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onLanguageChange(null)}
+              aria-pressed={autoLanguage}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 text-[12px] font-bold transition-all ${
+                autoLanguage
+                  ? "border-amber-500 bg-amber-500 text-slate-950 shadow-sm"
+                  : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-[#0c1626] dark:text-slate-300"
+              }`}
+            >
+              <Icon name="sparkles" size={14} />
+              Auto-Detect (Match Query Tongue)
+            </button>
+
+            {LANGUAGES.map((option) => {
+              const selected = !autoLanguage && option.code === language;
+              return (
+                <button
+                  key={option.code}
+                  type="button"
+                  onClick={() => onLanguageChange(option.code)}
+                  aria-pressed={selected}
+                  className={`rounded-xl border px-3 py-2 text-[12px] font-semibold transition-all ${
+                    selected
+                      ? "border-amber-500 bg-amber-500 text-slate-950 font-bold shadow-sm"
+                      : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-[#0c1626] dark:text-slate-300"
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  <span className={`ml-1 text-[10.5px] ${selected ? "text-slate-950 opacity-80" : "opacity-50"}`}>
+                    ({option.english})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Command Bridge Ready Bar (Bottom Deck) */}
+        <div className="solid-deck flex flex-col sm:flex-row items-center justify-between gap-5">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Command Bridge Ready
+              </h3>
+            </div>
+            <p className="mt-1 text-[12.5px] text-slate-600 dark:text-slate-400">
+              Configured: <strong className="text-slate-900 dark:text-white capitalize">{role}</strong> at{" "}
+              <strong className="text-slate-900 dark:text-white">{location.name} Station</strong> · (
+              {autoLanguage ? "Auto-Detect Language" : language.toUpperCase()})
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onEnter}
+            className="btn-hero-amber w-full sm:w-auto px-8 py-3.5 text-[15px]"
+          >
+            <span>Launch Maritime Console</span>
+            <Icon name="arrow-right" size={16} />
+          </button>
+        </div>
+
+        <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400 text-center pb-8">
+          Statutory operational advisory: ORCA provides explainable AI decision support based on INCOIS, Copernicus Marine,
+          and IMD meteorological data feeds. Navigational commands must always verify official Solas notices to mariners.
+        </p>
       </main>
     </div>
   );

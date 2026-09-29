@@ -43,7 +43,7 @@ export default function NavRail({
   return (
     <nav
       aria-label="Main Navigation"
-      className={`z-20 flex shrink-0 border-slate-200 bg-white/98 backdrop-blur-md dark:border-white/10 dark:bg-[#080e1c] ${
+      className={`z-20 flex shrink-0 border-slate-200/80 bg-white/85 backdrop-blur-2xl dark:border-emerald-500/20 dark:bg-[#030914]/85 ${
         bar
           ? "h-[58px] w-full border-t md:hidden"
           : "hidden md:flex md:h-full md:w-[72px] md:flex-col md:border-r md:py-3.5 shadow-sm"

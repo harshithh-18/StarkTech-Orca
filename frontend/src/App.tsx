@@ -165,6 +165,8 @@ export default function App() {
         onLanguageChange={setLanguage}
         onLocationChange={setLocation}
         onEnter={complete}
+        theme={theme.choice}
+        onThemeCycle={theme.cycle}
       />
     );
   }
@@ -294,7 +296,7 @@ export default function App() {
   );
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-slate-50 dark:bg-[#060c18]">
+    <div className="flex h-screen flex-col overflow-hidden maritime-cinema-canvas">
       <TopBar
         location={profile.location}
         onLocationChange={setLocation}
@@ -348,7 +350,7 @@ export default function App() {
 
         {/* ── Primary Panel ─────────────────────────────────────────── */}
         <section
-          className={`min-h-0 flex-col border-slate-200 bg-white md:flex md:w-[380px] md:shrink-0 md:border-r xl:w-[410px] dark:border-white/10 dark:bg-[#080e1c] shadow-sm ${
+          className={`min-h-0 flex-col border-r border-slate-200 bg-white md:flex md:w-[380px] md:shrink-0 xl:w-[410px] dark:border-slate-800 dark:bg-[#0a1424] shadow-xl ${
             mobileMap ? "hidden" : "flex flex-1"
           }`}
         >

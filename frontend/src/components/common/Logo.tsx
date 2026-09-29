@@ -16,23 +16,23 @@ interface Props {
   className?: string;
 }
 
-export default function Logo({ size = 32, rounded = "rounded-xl", className = "" }: Props) {
+export default function Logo({ size = 32, rounded = "rounded-full", className = "" }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
 
   return (
     <span
       aria-hidden="true"
       style={{ width: size, height: size }}
-      className={`relative grid shrink-0 place-items-center overflow-hidden bg-gradient-to-br from-abyss-950 via-ocean-950 to-marine-950 shadow-sm border border-cyan-500/20 ${rounded} ${className}`}
+      className={`relative inline-flex shrink-0 items-center justify-center ${rounded} ${className}`}
     >
       {!imgFailed ? (
         <img
           src={LOGO_SRC}
-          alt=""
+          alt="ORCA"
           width={size}
           height={size}
           onError={() => setImgFailed(true)}
-          className="h-full w-full scale-[1.35] object-contain"
+          className="h-full w-full object-contain drop-shadow-sm"
         />
       ) : (
         // High-end nautical Orca emblem over ocean swell

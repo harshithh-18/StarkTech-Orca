@@ -124,7 +124,7 @@ export default function TopBar({
   }, []);
 
   return (
-    <header className="relative z-40 flex h-14 shrink-0 items-center gap-2.5 sm:gap-3 border-b border-slate-200 bg-white/98 px-3 sm:px-4 backdrop-blur-md dark:border-white/10 dark:bg-[#080e1c] shadow-sm">
+    <header className="relative z-40 flex h-14 shrink-0 items-center gap-2.5 sm:gap-3 border-b border-slate-200 bg-white px-3 sm:px-4 dark:border-slate-800 dark:bg-[#08101e] shadow-sm">
       {/* ── Brand Identity ────────────────────────────────────────────── */}
       <div className="flex items-center gap-2.5">
         <Logo size={34} rounded="rounded-xl" className="shadow-sm ring-1 ring-emerald-500/40" />
